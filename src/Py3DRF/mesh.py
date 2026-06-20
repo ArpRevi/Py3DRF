@@ -1,14 +1,19 @@
-import bpy
 import numpy as np
 
-from b3Dv.pointCloudNodes import MeshToPointCloudNodeTree
-from b3Dv.materials import Material
-from b3Dv.camera import Camera
+from .materials import Material
+from .camera import Camera
+from .pointCloudNodes import PointCloudSettings
+
 
 class Mesh:
     """
-    Mesh class representing a Blender mesh object.
+    Mesh class representing the geometry, placement and appearance of a renderable mesh object.
+
+    This module has no dependency on bpy. Building the actual Blender mesh and object
+    data-blocks from a Mesh instance is the responsibility of Scene (see scene.py), which is
+    the only module in this package allowed to import bpy.
     """
+
     def __init__(
             self,
             name="Mesh",
@@ -18,7 +23,7 @@ class Mesh:
             location=(0, 0, 0),
             rotation=(0, 0, 0),
             scale=(1, 1, 1),
-            material:Material=None,
+            material: Material = None,
             shade_smooth=False
             ) -> None:
         """
@@ -35,20 +40,24 @@ class Mesh:
         :param shade_smooth: Boolean setting smooth shading.
 
         """
-        self.data = bpy.data.meshes.new(name=name)
-        self.data.from_pydata(vertices, edges, faces)
-        self.data.update()
-        self.data.validate()
-        self.object = bpy.data.objects.new(name, self.data)
-        self.setLocation(location)
-        self.setRotation(rotation)
-        self.setScale(scale)
+        self.name = name
+        self.vertices = vertices
+        self.edges = edges
+        self.faces = faces
+
+        self.location = np.array(location, dtype=float)
+        self.rotation = np.array(rotation, dtype=float)
+        self.scale = np.array(scale, dtype=float)
+
+        self.float_attributes = {}
+        self.color_attributes = {}
+        self.point_cloud_settings = None
+        self.is_shadow_catcher = False
 
         if material is None:
             material = Material()
 
         self.setMaterial(material)
-
         self.setShadeSmooth(shade_smooth)
 
     def addFloatAttribute(self, data, name="value", domain="POINT"):
@@ -60,8 +69,7 @@ class Mesh:
         :param domain: Domain to which the point refers to. Can be one of POINT, FACE, EDGE, CORNER.
 
         """
-        attribute = self.object.data.attributes.new(name=name, type='FLOAT', domain=domain)
-        attribute.data.foreach_set('value', data.ravel())
+        self.float_attributes[name] = (np.asarray(data), domain)
 
     def addColorAttribute(self, data, name="value", domain="POINT"):
         """
@@ -72,8 +80,45 @@ class Mesh:
         :param domain: Domain to which the point refers to. Can be one of POINT, FACE, EDGE, CORNER.
 
         """
-        attribute = self.object.data.attributes.new(name=name, type='FLOAT_COLOR', domain=domain)
-        attribute.data.foreach_set('color', data.ravel())
+        self.color_attributes[name] = (np.asarray(data), domain)
+
+    def _localToWorldMatrix(self):
+        """
+        Build the 4x4 local-to-world transform matrix (translation * rotation * scale), matching
+        Blender's object.matrix_basis for the default 'XYZ' Euler rotation order.
+
+        :return: 4x4 numpy array.
+
+        """
+        rx, ry, rz = self.rotation
+        cx, sx = np.cos(rx), np.sin(rx)
+        cy, sy = np.cos(ry), np.sin(ry)
+        cz, sz = np.cos(rz), np.sin(rz)
+
+        rotation_x = np.array([[1, 0, 0], [0, cx, -sx], [0, sx, cx]])
+        rotation_y = np.array([[cy, 0, sy], [0, 1, 0], [-sy, 0, cy]])
+        rotation_z = np.array([[cz, -sz, 0], [sz, cz, 0], [0, 0, 1]])
+
+        rotation_matrix = rotation_z @ rotation_y @ rotation_x
+        scale_matrix = np.diag(self.scale)
+
+        matrix = np.eye(4)
+        matrix[:3, :3] = rotation_matrix @ scale_matrix
+        matrix[:3, 3] = self.location
+        return matrix
+
+    def _worldVertices(self):
+        """
+        :return: Vertices in the global reference frame, as an (n, 3) numpy array.
+        """
+        if len(self.vertices) == 0:
+            return np.zeros((0, 3))
+
+        matrix = self._localToWorldMatrix()
+        local = np.asarray(self.vertices, dtype=float)
+        homogeneous = np.hstack([local, np.ones((len(local), 1))])
+        world = (matrix @ homogeneous.T).T
+        return world[:, :3]
 
     def getMinZ(self):
         """
@@ -82,13 +127,11 @@ class Mesh:
         :return: The min Z coordinate of the set of points.
 
         """
-        minz = float('inf')
-        for vert in self.data.vertices:
-            wolrd_vert = self.object.matrix_basis @ vert.co
-            if wolrd_vert[2] < minz:
-                minz = wolrd_vert[2]
-        return minz
-    
+        world = self._worldVertices()
+        if len(world) == 0:
+            return float('inf')
+        return float(world[:, 2].min())
+
     def getMaxZ(self):
         """
         Get the max Z value.
@@ -96,13 +139,11 @@ class Mesh:
         :return: The max Z coordinate of the set of points.
 
         """
-        maxz = -float('inf')
-        for vert in self.data.vertices:
-            wolrd_vert = self.object.matrix_basis @ vert.co
-            if wolrd_vert[2] > maxz:
-                maxz = wolrd_vert[2]
-        return maxz
-    
+        world = self._worldVertices()
+        if len(world) == 0:
+            return -float('inf')
+        return float(world[:, 2].max())
+
     def setLocation(self, location=(0, 0, 0)):
         """
         Set the location of the object with respect to the global reference frame.
@@ -110,7 +151,7 @@ class Mesh:
         :param location: Vector of coordinates representing the new location of the object.
 
         """
-        self.object.location = location
+        self.location = np.array(location, dtype=float)
 
     def setRotation(self, rotation=(0, 0, 0)):
         """
@@ -119,7 +160,7 @@ class Mesh:
         :param rotation: Rotation of the mesh object in the local reference frame in radiants.
 
         """
-        self.object.rotation_euler = rotation
+        self.rotation = np.array(rotation, dtype=float)
 
     def setScale(self, scale=(1, 1, 1)):
         """
@@ -128,9 +169,9 @@ class Mesh:
         :param scale: Scale on the xyz axes.
 
         """
-        self.object.scale = scale
+        self.scale = np.array(scale, dtype=float)
 
-    def getFloor(self, size=(10,10), shadow_catcher=True):
+    def getFloor(self, size=(10, 10), shadow_catcher=True):
         """
         Get a planar mesh object that acts as floor for the mesh object.
 
@@ -149,10 +190,10 @@ class Mesh:
         faces = [
             (0, 1, 2, 3)
         ]
-        floor = Mesh("Floor", vertices=verices, faces=faces, location=(0,0, minz))
-        floor.object.is_shadow_catcher = shadow_catcher
+        floor = Mesh("Floor", vertices=verices, faces=faces, location=(0, 0, minz))
+        floor.is_shadow_catcher = shadow_catcher
         return floor
-    
+
     def getCamera(self, azimuth=np.pi/4, elevation=np.pi/9, distance=3):
         """
         Get a camera object focused on the origin of the local reference frame.
@@ -164,10 +205,10 @@ class Mesh:
 
         """
         camera = Camera()
-        camera.focusOnPoint(self.object.location, azimuth, elevation, distance)
+        camera.focusOnPoint(self.location, azimuth, elevation, distance)
         return camera
 
-    def setMaterial(self, material:Material):
+    def setMaterial(self, material: Material):
         """
         Link a material object to the mesh.
 
@@ -175,8 +216,6 @@ class Mesh:
 
         """
         self.material = material
-        self.data.materials.clear()
-        self.data.materials.append(material.data)
 
     def setShadeSmooth(self, shade_smooth=True):
         """
@@ -185,12 +224,9 @@ class Mesh:
         :param shade_smooth: Boolean setting smooth shading.
 
         """
-        if shade_smooth:
-            self.data.shade_smooth()
-        else:
-            self.data.shade_flat()
+        self.shade_smooth = shade_smooth
 
-    def asPointCloud(self, name="Pointcloud", radius=0.01, subdivison=3, material:Material=None):
+    def asPointCloud(self, name="Pointcloud", radius=0.01, subdivison=3, material: Material = None):
         """
         Set rendering as pointcloud.
 
@@ -198,12 +234,11 @@ class Mesh:
         :param radius: Radius of the rendered pointclouds.
         :param subdivision: Number of subdivisions of the icospheres representing the points.
         :param material: Material object to link to the point cloud.
+        :return: The PointCloudSettings describing the point cloud rendering.
 
         """
         if material is None and self.material is not None:
             material = self.material
 
-        node_tree = MeshToPointCloudNodeTree(material=material, radius=radius, subdivison=subdivison)
-
-        modifier = self.object.modifiers.new(name, 'NODES')
-        modifier.node_group = node_tree.node_group
+        self.point_cloud_settings = PointCloudSettings(name=name, radius=radius, subdivison=subdivison, material=material)
+        return self.point_cloud_settings

@@ -1,8 +1,15 @@
+"""
+SunLight class describing the placement and strength of a directional (sun) light.
+
+This module has no dependency on bpy. Building the actual Blender light and object
+data-blocks from a SunLight instance is the responsibility of Scene (see scene.py), which is
+the only module in this package allowed to import bpy.
+"""
 
 
 class SunLight:
     """
-    SunLight class representing the Blender sun light object.
+    SunLight class representing a directional (sun) light's placement and strength.
     """
 
     def __init__(self, name="Sun", location=(0, 0, 0), rotation=(0, 0, 0), scale=(1, 1, 1), strength=5.0):
@@ -17,7 +24,7 @@ class SunLight:
         """
         self.name = name
         self.location = location
-        self.rotation_euler = rotation
+        self.rotation = rotation
         self.scale = scale
         self.strength = strength
 
