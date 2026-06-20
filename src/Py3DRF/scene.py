@@ -32,27 +32,48 @@ class Scene:
 
         self.data.view_layers[0].cycles.use_pass_shadow_catcher = True
 
-        self.data.use_nodes = True
-        self.nodes = {"input" : self.data.node_tree.nodes["Render Layers"], 
-                      "output" : self.data.node_tree.nodes["Composite"]}
-        self.data.node_tree.links.clear()
+        # Enable compositor rendering
+        self.data.render.use_compositing = True
+
+        # Create a new, modern Blender 5.0+ compositor node tree data-block
+        comp_tree = bpy.data.node_groups.new(name + "_Compositor", "CompositorNodeTree")
+        self.data.compositing_node_group = comp_tree
+
+        # Instantiate Input and Output nodes
+        self.nodes = {
+            "input": comp_tree.nodes.new(type="CompositorNodeRLayers"),
+            "output": comp_tree.nodes.new(type="NodeGroupOutput")
+        }
+
+        # comp_tree was just created above, so it never already has an output socket.
+        # (NodeTreeInterface has no .inputs/.outputs attribute to check against -- only
+        # .items_tree and .new_socket().)
+        comp_tree.interface.new_socket(name="Image", in_out="OUTPUT", socket_type="NodeSocketColor")
+
+        comp_tree.links.clear()
         self.links = {}
 
         self.nodes['input'].scene = self.data
 
-        self.nodes['invert'] = self.data.node_tree.nodes.new("CompositorNodeInvert")
-        self.nodes['add'] = self.data.node_tree.nodes.new("CompositorNodeMixRGB")
-        self.nodes['setAlpha'] = self.data.node_tree.nodes.new("CompositorNodeSetAlpha")
+        # Instantiate unified utility node classes
+        self.nodes['invert'] = comp_tree.nodes.new("CompositorNodeInvert")
+        self.nodes['add'] = comp_tree.nodes.new("ShaderNodeMix")
+        self.nodes['setAlpha'] = comp_tree.nodes.new("CompositorNodeSetAlpha")
 
+        self.nodes['add'].data_type = 'RGBA'
         self.nodes['add'].blend_type = 'ADD'
-        self.nodes['setAlpha'].mode = 'REPLACE_ALPHA'
+        # TODO: CompositorNodeSetAlpha's `mode` enum property was removed in Blender 5.0
+        # (options-as-sockets migration). The replacement input socket name/value is
+        # unconfirmed -- see conversation. Currently using the node's default mode.
+        # self.nodes['setAlpha'].mode = 'REPLACE_ALPHA'
 
-        self.links['inputToInvert'] = self.data.node_tree.links.new(self.nodes["input"].outputs['Shadow Catcher'], self.nodes["invert"].inputs["Color"])
-        self.links['inputToAdd'] = self.data.node_tree.links.new(self.nodes['input'].outputs['Alpha'], self.nodes['add'].inputs['Image'])
-        self.links['invertToAdd'] = self.data.node_tree.links.new(self.nodes['invert'].outputs['Color'], self.nodes['add'].inputs['Image_001'])
-        self.links['inputToSetAlpha'] = self.data.node_tree.links.new(self.nodes['input'].outputs['Image'], self.nodes['setAlpha'].inputs['Image'])
-        self.links['addToSetAlpha'] = self.data.node_tree.links.new(self.nodes['add'].outputs['Image'], self.nodes['setAlpha'].inputs['Alpha'])
-        self.links['setAlphaToOutput'] = self.data.node_tree.links.new(self.nodes['setAlpha'].outputs['Image'], self.nodes['output'].inputs['Image'])
+        # Link up the updated composite pipeline (Using sockets 'A', 'B', and 'Result')
+        self.links['inputToInvert'] = comp_tree.links.new(self.nodes["input"].outputs['Shadow Catcher'], self.nodes["invert"].inputs["Color"])
+        self.links['inputToAdd'] = comp_tree.links.new(self.nodes['input'].outputs['Alpha'], self.nodes['add'].inputs['A'])
+        self.links['invertToAdd'] = comp_tree.links.new(self.nodes['invert'].outputs['Color'], self.nodes['add'].inputs['B'])
+        self.links['inputToSetAlpha'] = comp_tree.links.new(self.nodes['input'].outputs['Image'], self.nodes['setAlpha'].inputs['Image'])
+        self.links['addToSetAlpha'] = comp_tree.links.new(self.nodes['add'].outputs['Result'], self.nodes['setAlpha'].inputs['Alpha'])
+        self.links['setAlphaToOutput'] = comp_tree.links.new(self.nodes['setAlpha'].outputs['Image'], self.nodes['output'].inputs['Image'])
 
         self.setShadowCatcherAlpha(shadow_catcher_alpha)
         self.setGamma(gamma)
@@ -161,7 +182,8 @@ class Scene:
         :param alpha: Alpha value to use.
 
         """
-        self.nodes['add'].inputs['Fac'].default_value = alpha
+        # ShaderNodeMix maps the mixing factor configuration to 'Factor' instead of 'Fac'
+        self.nodes['add'].inputs['Factor'].default_value = alpha
 
     def renderToFile(self, filepath):
         """
