@@ -2,16 +2,16 @@ import numpy as np
 
 from .materials import Material
 from .camera import Camera
-from .pointCloudNodes import PointCloudSettings
+from .pointcloud import PointCloudSettings
 
 
 class Mesh:
     """
     Mesh class representing the geometry, placement and appearance of a renderable mesh object.
 
-    This module has no dependency on bpy. Building the actual Blender mesh and object
-    data-blocks from a Mesh instance is the responsibility of Scene (see scene.py), which is
-    the only module in this package allowed to import bpy.
+    This module (Py3DRF.core) has no dependency on any rendering backend. Building the
+    actual backend-native mesh object from a Mesh instance is the responsibility of
+    whichever backend the user chose via the Scene facade.
     """
 
     def __init__(

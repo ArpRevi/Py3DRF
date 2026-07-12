@@ -1,0 +1,21 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "Py3DRF"
+version = "0.2.0"
+description = "A backend-agnostic facade for 3D scene description and rendering."
+requires-python = ">=3.10"
+dependencies = [
+    "numpy",
+]
+
+[project.optional-dependencies]
+blender = ["bpy>=4.0"]
+plotly = ["plotly", "kaleido"]
+polyscope = ["polyscope"]
+all = ["Py3DRF[blender,plotly,polyscope]"]
+
+[tool.setuptools.packages.find]
+where = ["src"]

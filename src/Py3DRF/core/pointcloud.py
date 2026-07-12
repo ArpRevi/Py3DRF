@@ -1,10 +1,10 @@
 """
 Settings describing how a Mesh should be rendered as a point cloud.
 
-This module has no dependency on bpy. Building the actual Blender
-geometry-nodes node tree from a PointCloudSettings instance is the
-responsibility of Scene (see scene.py), which is the only module in this
-package allowed to import bpy.
+This module (Py3DRF.core) has no dependency on any rendering backend. Building the actual
+backend-native point-cloud representation from a PointCloudSettings instance (Blender
+geometry nodes, a Plotly go.Scatter3d, a Polyscope point cloud, ...) is the responsibility
+of whichever backend the user chose via the Scene facade.
 """
 
 from .materials import Material
@@ -71,6 +71,6 @@ class PointCloudSettings:
 
 # Backwards-compatible alias: this class used to eagerly build the Blender
 # geometry-nodes node tree in its constructor (hence the name). It is now a
-# plain settings object; Scene builds the actual bpy node tree from it on
-# demand, when the owning Mesh is added to a Scene.
+# plain settings object; the chosen backend builds the actual native
+# representation from it on demand, when the owning Mesh is added to a Scene.
 MeshToPointCloudNodeTree = PointCloudSettings

@@ -1,9 +1,9 @@
 """
 SunLight class describing the placement and strength of a directional (sun) light.
 
-This module has no dependency on bpy. Building the actual Blender light and object
-data-blocks from a SunLight instance is the responsibility of Scene (see scene.py), which is
-the only module in this package allowed to import bpy.
+This module (Py3DRF.core) has no dependency on any rendering backend. Building the actual
+backend-native light object from a SunLight instance is the responsibility of the chosen
+backend (e.g. Py3DRF.backends.blender.scene.SceneBlender), never of core itself.
 """
 
 

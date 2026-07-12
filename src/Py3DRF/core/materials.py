@@ -1,11 +1,11 @@
 """
 Material class describing the appearance of a renderable surface.
 
-This module has no dependency on bpy (Blender's Python API). A Material only
-stores the parameters needed to describe a material; turning a Material
-instance into an actual Blender material (node tree, etc.) is the
-responsibility of Scene (see scene.py), which is the only module in this
-package allowed to import bpy.
+This module (Py3DRF.core) has no dependency on any rendering backend. A Material only
+stores the parameters needed to describe a material; turning a Material instance into an
+actual backend-native material (a Blender node tree, a Plotly vertexcolor array, a
+Polyscope color quantity, etc.) is the responsibility of whichever backend the user
+chose via the Scene facade.
 """
 
 

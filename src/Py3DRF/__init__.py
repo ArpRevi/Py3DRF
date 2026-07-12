@@ -1,11 +1,27 @@
-from .camera import Camera
-from .mesh import Mesh
-from .lights import SunLight
-from .materials import Material
+"""
+Py3DRF: a backend-agnostic facade for 3D scene description and rendering.
 
-__all__ = ['Camera', 'Mesh', 'SunLight', 'Material']
+Public API:
+    Scene                                        -- choose a backend, render
+    Camera, Mesh, SunLight, Material, PointCloudSettings  -- backend-agnostic data model
 
+Importing Py3DRF never imports any backend's third-party dependency (bpy,
+plotly, polyscope, ...). Only Scene(backend=...) triggers loading the one
+backend you asked for; see Py3DRF.backends for details.
+"""
 
+from .core import Camera, SunLight, Material, Mesh, PointCloudSettings
 from .scene import Scene
+from .backends import available_backends
+from .backends.base import NotSupportedByBackendError
 
-__all__.append('Scene')
+__all__ = [
+    "Scene",
+    "Camera",
+    "SunLight",
+    "Material",
+    "Mesh",
+    "PointCloudSettings",
+    "available_backends",
+    "NotSupportedByBackendError",
+]
