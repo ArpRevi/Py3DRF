@@ -1,11 +1,12 @@
 import numpy as np
+from .types import Location
 
 class Camera:
     """
     Camera class representing the Blender camera object.
     """
 
-    def __init__(self, name="Camera", location=(0, 0, 0), rotation=(0, 0, 0), scale=(1, 1, 1), focal_length=50):
+    def __init__(self, name="Camera", location=Location(0, 0, 0), rotation=(0, 0, 0), scale=(1, 1, 1), focal_length=50):
         """
 
         :param name: Name of the camera object.
@@ -57,7 +58,7 @@ class Camera:
         """
         self.scale = scale
 
-    def focusOnPoint(self, point, azimuth=np.pi/4, elevation=np.pi/9, distance=3):
+    def focusOnPoint(self, point :Location, azimuth=np.pi/4, elevation=np.pi/9, distance=3):
         """
         Reposition the camera to focus on a point.
 
@@ -70,7 +71,7 @@ class Camera:
         x = distance * np.cos(azimuth) * np.cos(elevation)
         y = distance * np.sin(azimuth) * np.cos(elevation)
         z = distance * np.sin(elevation)
-        coords = np.array((x, y, z)) + point
+        coords = np.array((x, y, z)) + point.to_array()
         rotation = (np.pi/2 - elevation, 0, azimuth + np.pi/2)
-        self.setLocation(coords)
+        self.setLocation(Location(*coords))
         self.setRotation(rotation)

@@ -216,7 +216,7 @@ class SceneBlender(SceneBackend):
         data.lens = camera.focal_length
 
         obj = bpy.data.objects.new(camera.name, data)
-        obj.location = tuple(camera.location)
+        obj.location = camera.location.to_tuple()
         obj.rotation_euler = tuple(camera.rotation)
         obj.scale = tuple(camera.scale)
         return obj
@@ -229,7 +229,7 @@ class SceneBlender(SceneBackend):
         data.energy = light.strength
 
         obj = bpy.data.objects.new(light.name, data)
-        obj.location = tuple(light.location)
+        obj.location = light.location.to_tuple()
         obj.rotation_euler = tuple(light.rotation)
         obj.scale = tuple(light.scale)
         return obj
@@ -262,7 +262,7 @@ class SceneBlender(SceneBackend):
             data.shade_flat()
 
         obj = bpy.data.objects.new(mesh.name, data)
-        obj.location = tuple(mesh.location)
+        obj.location = mesh.location.to_tuple()
         obj.rotation_euler = tuple(mesh.rotation)
         obj.scale = tuple(mesh.scale)
         obj.is_shadow_catcher = mesh.is_shadow_catcher

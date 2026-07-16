@@ -49,7 +49,7 @@ class ScenePlotly(SceneBackend):
         self.figure.update_layout(
             scene=dict(
                 aspectmode="data",
-                xaxis=dict(visible=not transparent or True),
+                xaxis=dict(visible=not transparent),
             ),
             paper_bgcolor="rgba(0,0,0,0)" if transparent else "white",
             margin=dict(l=0, r=0, t=0, b=0),
@@ -80,9 +80,9 @@ class ScenePlotly(SceneBackend):
         :return: The plotly camera dict that was applied to the figure.
 
         """
-        location = np.asarray(camera.location, dtype=float)
+        location = camera.location
         camera_dict = dict(
-            eye=dict(x=float(location[0]), y=float(location[1]), z=float(location[2])),
+            eye=dict(x=float(location.x), y=float(location.y), z=float(location.z)),
             center=dict(x=0.0, y=0.0, z=0.0),
             up=dict(x=0.0, y=0.0, z=1.0),
         )

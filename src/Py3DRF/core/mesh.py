@@ -3,7 +3,7 @@ import numpy as np
 from .materials import Material
 from .camera import Camera
 from .pointcloud import PointCloudSettings
-
+from .types import Location
 
 class Mesh:
     """
@@ -20,7 +20,7 @@ class Mesh:
             vertices=[],
             edges=[],
             faces=[],
-            location=(0, 0, 0),
+            location=Location(0, 0, 0),
             rotation=(0, 0, 0),
             scale=(1, 1, 1),
             material: Material = None,
@@ -45,7 +45,7 @@ class Mesh:
         self.edges = edges
         self.faces = faces
 
-        self.location = np.array(location, dtype=float)
+        self.location = location
         self.rotation = np.array(rotation, dtype=float)
         self.scale = np.array(scale, dtype=float)
 
@@ -104,7 +104,7 @@ class Mesh:
 
         matrix = np.eye(4)
         matrix[:3, :3] = rotation_matrix @ scale_matrix
-        matrix[:3, 3] = self.location
+        matrix[:3, 3] = self.location.to_tuple()
         return matrix
 
     def _worldVertices(self):
@@ -144,15 +144,14 @@ class Mesh:
             return -float('inf')
         return float(world[:, 2].max())
 
-    def setLocation(self, location=(0, 0, 0)):
+    def setLocation(self, location=Location(0, 0, 0)):
         """
         Set the location of the object with respect to the global reference frame.
 
         :param location: Vector of coordinates representing the new location of the object.
 
         """
-        self.location = np.array(location, dtype=float)
-
+        self.location = location.to_array()
     def setRotation(self, rotation=(0, 0, 0)):
         """
         Set the rotation of the object with pivot point the origin of the local reference frame.
@@ -181,16 +180,16 @@ class Mesh:
 
         """
         minz = self.getMinZ()
-        verices = [
-            (-size[0]/2, -size[0]/2, 0),
-            (-size[0]/2, size[0]/2, 0),
-            (size[0]/2, size[0]/2, 0),
-            (size[0]/2, -size[0]/2, 0),
+        vertices = [
+            (-size[0]/2, -size[1]/2, 0),
+            (-size[0]/2, size[1]/2, 0),
+            (size[0]/2, size[1]/2, 0),
+            (size[0]/2, -size[1]/2, 0),
         ]
         faces = [
             (0, 1, 2, 3)
         ]
-        floor = Mesh("Floor", vertices=verices, faces=faces, location=(0, 0, minz))
+        floor = Mesh("Floor", vertices=vertices, faces=faces, location=Location(0, 0, minz))
         floor.is_shadow_catcher = shadow_catcher
         return floor
 

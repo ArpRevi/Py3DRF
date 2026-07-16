@@ -1,18 +1,11 @@
-"""
-SunLight class describing the placement and strength of a directional (sun) light.
-
-This module (Py3DRF.core) has no dependency on any rendering backend. Building the actual
-backend-native light object from a SunLight instance is the responsibility of the chosen
-backend (e.g. Py3DRF.backends.blender.scene.SceneBlender), never of core itself.
-"""
-
+from .types import Location
 
 class SunLight:
     """
     SunLight class representing a directional (sun) light's placement and strength.
     """
 
-    def __init__(self, name="Sun", location=(0, 0, 0), rotation=(0, 0, 0), scale=(1, 1, 1), strength=5.0):
+    def __init__(self, name="Sun", location=Location(0, 0, 0), rotation=(0, 0, 0), scale=(1, 1, 1), strength=5.0):
         """
 
         :param name: Name of the sun light object.

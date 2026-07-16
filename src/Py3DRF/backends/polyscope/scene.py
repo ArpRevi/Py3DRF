@@ -88,7 +88,7 @@ class ScenePolyscope(SceneBackend):
         :return: The (location, target) tuple that was applied to the view.
 
         """
-        location = tuple(float(v) for v in camera.location)
+        location = camera.location.to_tuple()
         target = (0.0, 0.0, 0.0)
         ps.look_at(location, target)
         return (location, target)
