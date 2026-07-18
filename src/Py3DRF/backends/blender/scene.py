@@ -18,6 +18,7 @@ from ...core.materials import Material
 from ...core.mesh import Mesh
 from ...core.pointcloud import PointCloudSettings
 from ..base import SceneBackend
+from ...core.types import Location, Rotation, Scale
 
 
 class SceneBlender(SceneBackend):
@@ -85,7 +86,7 @@ class SceneBlender(SceneBackend):
         self.data.world = world
 
         if deafult_sun:
-            sun = SunLight(rotation=(-30 * np.pi/180, 0, -10 * np.pi/180))
+            sun = SunLight(rotation=Rotation(-30 * np.pi/180, 0, -10 * np.pi/180))
             self.addObject(sun)
 
     def setRenderEngine(self, engine):
@@ -217,8 +218,8 @@ class SceneBlender(SceneBackend):
 
         obj = bpy.data.objects.new(camera.name, data)
         obj.location = camera.location.to_tuple()
-        obj.rotation_euler = tuple(camera.rotation)
-        obj.scale = tuple(camera.scale)
+        obj.rotation_euler = camera.rotation.to_tuple()
+        obj.scale = camera.scale.to_tuple()
         return obj
 
     def _buildLightObject(self, light: SunLight):
@@ -230,8 +231,8 @@ class SceneBlender(SceneBackend):
 
         obj = bpy.data.objects.new(light.name, data)
         obj.location = light.location.to_tuple()
-        obj.rotation_euler = tuple(light.rotation)
-        obj.scale = tuple(light.scale)
+        obj.rotation_euler = light.rotation.to_tuple()
+        obj.scale = light.scale.to_tuple()
         return obj
 
     def _buildMeshObject(self, mesh: Mesh):
@@ -263,8 +264,8 @@ class SceneBlender(SceneBackend):
 
         obj = bpy.data.objects.new(mesh.name, data)
         obj.location = mesh.location.to_tuple()
-        obj.rotation_euler = tuple(mesh.rotation)
-        obj.scale = tuple(mesh.scale)
+        obj.rotation_euler = mesh.rotation.to_tuple()
+        obj.scale = mesh.scale.to_tuple()
         obj.is_shadow_catcher = mesh.is_shadow_catcher
 
         if mesh.point_cloud_settings is not None:

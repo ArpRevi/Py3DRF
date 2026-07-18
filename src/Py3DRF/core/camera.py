@@ -1,12 +1,14 @@
 import numpy as np
 from .types import Location
+from .types import Rotation
+from .types import Scale
 
 class Camera:
     """
     Camera class representing the Blender camera object.
     """
 
-    def __init__(self, name="Camera", location=Location(0, 0, 0), rotation=(0, 0, 0), scale=(1, 1, 1), focal_length=50):
+    def __init__(self, name="Camera", location=Location(0, 0, 0), rotation=Rotation(0, 0, 0), scale=Scale(1, 1, 1), focal_length=50):
         """
 
         :param name: Name of the camera object.
@@ -31,7 +33,7 @@ class Camera:
         """
         self.focal_length = focal_length
 
-    def setLocation(self, location):
+    def setLocation(self, location :Location):
         """
         Set location of the camera object.
 
@@ -40,7 +42,7 @@ class Camera:
         """
         self.location = location
 
-    def setRotation(self, rotation):
+    def setRotation(self, rotation :Rotation):
         """
         Set rotation of the camera object.
 
@@ -49,7 +51,7 @@ class Camera:
         """
         self.rotation = rotation
 
-    def setScale(self, scale):
+    def setScale(self, scale :Scale):
         """
         Set scale of the camera object.
 
@@ -72,6 +74,6 @@ class Camera:
         y = distance * np.sin(azimuth) * np.cos(elevation)
         z = distance * np.sin(elevation)
         coords = np.array((x, y, z)) + point.to_array()
-        rotation = (np.pi/2 - elevation, 0, azimuth + np.pi/2)
+        rotation = Rotation(np.pi/2 - elevation, 0, azimuth + np.pi/2)
         self.setLocation(Location(*coords))
         self.setRotation(rotation)

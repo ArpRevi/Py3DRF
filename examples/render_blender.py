@@ -6,8 +6,10 @@ import os
 
 from Py3DRF import Scene
 from Py3DRF import Mesh
+from Py3DRF import Location, Rotation, Scale
 
 # Data load
+"""suzanne = o3d.io.read_triangle_mesh('000000_tumoredbrain.stl')"""
 suzanne = o3d.io.read_triangle_mesh('smooth_suzanne.obj')
 
 # Convert to array and switch from y-up to z-up
@@ -23,7 +25,7 @@ color_attr = np.hstack((V, np.ones((V.shape[0], 1))))
 scene = Scene(resolution=(1080, 1080), engine="CYCLES", deafult_sun=True)
 
 # Init mesh
-mesh = Mesh("Suzanne", V, [], F, scale=(0.5, 0.5, 0.5))
+mesh = Mesh("Suzanne", V, [], F, scale=Scale(0.5, 0.5, 0.5))
 
 # Link attributes to mesh
 mesh.addColorAttribute(color_attr, "color_attr")

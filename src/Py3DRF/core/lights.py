@@ -1,11 +1,13 @@
 from .types import Location
+from .types import Rotation
+from .types import Scale
 
 class SunLight:
     """
     SunLight class representing a directional (sun) light's placement and strength.
     """
 
-    def __init__(self, name="Sun", location=Location(0, 0, 0), rotation=(0, 0, 0), scale=(1, 1, 1), strength=5.0):
+    def __init__(self, name="Sun", location=Location(0, 0, 0), rotation=Rotation(0, 0, 0), scale=Scale(1, 1, 1), strength=5.0):
         """
 
         :param name: Name of the sun light object.
@@ -21,7 +23,7 @@ class SunLight:
         self.scale = scale
         self.strength = strength
 
-    def setLocation(self, location):
+    def setLocation(self, location :Location):
         """
         Set location of the sun light object.
 
@@ -30,7 +32,7 @@ class SunLight:
         """
         self.location = location
 
-    def setRotation(self, rotation):
+    def setRotation(self, rotation :Rotation):
         """
         Set rotation of the sun light object.
 
@@ -39,7 +41,7 @@ class SunLight:
         """
         self.rotation = rotation
 
-    def setScale(self, scale):
+    def setScale(self, scale :Scale):
         """
         Set scale of the sun light object.
 

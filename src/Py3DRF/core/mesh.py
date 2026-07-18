@@ -4,6 +4,8 @@ from .materials import Material
 from .camera import Camera
 from .pointcloud import PointCloudSettings
 from .types import Location
+from .types import Rotation
+from .types import Scale
 
 class Mesh:
     """
@@ -21,8 +23,8 @@ class Mesh:
             edges=[],
             faces=[],
             location=Location(0, 0, 0),
-            rotation=(0, 0, 0),
-            scale=(1, 1, 1),
+            rotation=Rotation(0, 0, 0),
+            scale=Scale(1, 1, 1),
             material: Material = None,
             shade_smooth=False
             ) -> None:
@@ -41,14 +43,13 @@ class Mesh:
 
         """
         self.name = name
-        self.vertices = vertices
-        self.edges = edges
-        self.faces = faces
+        self.vertices = list(vertices)
+        self.edges = list(edges)
+        self.faces = list(faces)
 
         self.location = location
-        self.rotation = np.array(rotation, dtype=float)
-        self.scale = np.array(scale, dtype=float)
-
+        self.rotation = rotation
+        self.scale = scale
         self.float_attributes = {}
         self.color_attributes = {}
         self.point_cloud_settings = None
@@ -90,7 +91,7 @@ class Mesh:
         :return: 4x4 numpy array.
 
         """
-        rx, ry, rz = self.rotation
+        rx, ry, rz = self.rotation.to_tuple()
         cx, sx = np.cos(rx), np.sin(rx)
         cy, sy = np.cos(ry), np.sin(ry)
         cz, sz = np.cos(rz), np.sin(rz)
@@ -100,7 +101,7 @@ class Mesh:
         rotation_z = np.array([[cz, -sz, 0], [sz, cz, 0], [0, 0, 1]])
 
         rotation_matrix = rotation_z @ rotation_y @ rotation_x
-        scale_matrix = np.diag(self.scale)
+        scale_matrix = np.diag(self.scale.to_tuple())
 
         matrix = np.eye(4)
         matrix[:3, :3] = rotation_matrix @ scale_matrix
@@ -152,23 +153,23 @@ class Mesh:
 
         """
         self.location = location.to_array()
-    def setRotation(self, rotation=(0, 0, 0)):
+    def setRotation(self, rotation=Rotation(0, 0, 0)):
         """
         Set the rotation of the object with pivot point the origin of the local reference frame.
 
         :param rotation: Rotation of the mesh object in the local reference frame in radiants.
 
         """
-        self.rotation = np.array(rotation, dtype=float)
+        self.rotation = rotation
 
-    def setScale(self, scale=(1, 1, 1)):
+    def setScale(self, scale=Scale(1, 1, 1)):
         """
         Set the scale of the object in the global reference frame.
 
         :param scale: Scale on the xyz axes.
 
         """
-        self.scale = np.array(scale, dtype=float)
+        self.scale = scale
 
     def getFloor(self, size=(10, 10), shadow_catcher=True):
         """

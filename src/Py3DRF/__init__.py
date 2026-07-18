@@ -14,6 +14,7 @@ from .core import Camera, SunLight, Material, Mesh, PointCloudSettings
 from .scene import Scene
 from .backends import available_backends
 from .backends.base import NotSupportedByBackendError
+from .core.types import Location, Rotation, Scale
 
 __all__ = [
     "Scene",
@@ -24,4 +25,7 @@ __all__ = [
     "PointCloudSettings",
     "available_backends",
     "NotSupportedByBackendError",
+    "Location",
+    "Rotation",
+    "Scale"
 ]
