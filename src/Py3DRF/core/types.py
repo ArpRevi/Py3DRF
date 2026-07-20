@@ -6,11 +6,9 @@ class Location:
     """
     Represents a location in 3D space with x, y, and z coordinates.
     """
-
-    def __init__(self, x: float, y: float, z: float):
-        self.x = x
-        self.y = y
-        self.z = z
+    x: float
+    y: float
+    z: float
 
     def __repr__(self):
         return f"Location(x={self.x}, y={self.y}, z={self.z})"
@@ -36,11 +34,9 @@ class Rotation:
     """
     Represents a rotation in 3D space with roll, pitch, and yaw angles.
     """
-
-    def __init__(self, roll: float, pitch: float, yaw: float):
-        self.roll = roll
-        self.pitch = pitch
-        self.yaw = yaw
+    roll: float
+    pitch: float
+    yaw: float
 
     def __repr__(self):
         return f"Rotation(roll={self.roll}, pitch={self.pitch}, yaw={self.yaw})"
@@ -66,11 +62,9 @@ class Scale:
     """
     Represents a scale in 3D space with x, y, and z scaling factors.
     """
-
-    def __init__(self, x: float, y: float, z: float):
-        self.x = x
-        self.y = y
-        self.z = z
+    x: float
+    y: float
+    z: float
 
     def __repr__(self):
         return f"Scale(x={self.x}, y={self.y}, z={self.z})"
