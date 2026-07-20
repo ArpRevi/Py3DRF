@@ -1,7 +1,7 @@
 import numpy as np
+from dataclasses import dataclass
 
-
-
+@dataclass(frozen=True)
 class Location:
     """
     Represents a location in 3D space with x, y, and z coordinates.
@@ -31,6 +31,7 @@ class Location:
         """
         return (self.x, self.y, self.z)
 
+@dataclass(frozen=True)
 class Rotation:
     """
     Represents a rotation in 3D space with roll, pitch, and yaw angles.
@@ -60,6 +61,7 @@ class Rotation:
         """
         return (self.roll, self.pitch, self.yaw)
 
+@dataclass(frozen=True)
 class Scale:
     """
     Represents a scale in 3D space with x, y, and z scaling factors.

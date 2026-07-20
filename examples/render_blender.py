@@ -9,7 +9,7 @@ from Py3DRF import Mesh
 from Py3DRF import Location, Rotation, Scale
 
 # Data load
-"""suzanne = o3d.io.read_triangle_mesh('000000_tumoredbrain.stl')"""
+#suzanne = o3d.io.read_triangle_mesh('s0677_vertebrae_L3.nii.g_1.stl')
 suzanne = o3d.io.read_triangle_mesh('smooth_suzanne.obj')
 
 # Convert to array and switch from y-up to z-up
@@ -22,10 +22,10 @@ float_attr = V[:, 2]
 color_attr = np.hstack((V, np.ones((V.shape[0], 1))))
 
 # Init scene
-scene = Scene(resolution=(1080, 1080), engine="CYCLES", deafult_sun=True)
+scene = Scene(resolution=(1080, 1080), engine="CYCLES", deafult_sun=True, transparent=False)
 
 # Init mesh
-mesh = Mesh("Suzanne", V, [], F, scale=Scale(0.5, 0.5, 0.5))
+mesh = Mesh("Suzanne", V, [], F, scale=Scale(0.1, 0.1, 0.1))
 
 # Link attributes to mesh
 mesh.addColorAttribute(color_attr, "color_attr")
@@ -34,16 +34,20 @@ mesh.addFloatAttribute(float_attr, "float_attr")
 # Link mesh attributes to material
 mesh.material.setColorAttributeAsColor("color_attr")
 mesh.material.setFloatAttributeAsEmissionColor("float_attr")
-mesh.material.setEmissionStrength(10)
+#mesh.material.setEmissionStrength(10)
 
 # shade smooth
 mesh.setShadeSmooth()
 
 # use render as pointclouds
-mesh.asPointCloud()
+#mesh.asPointCloud()
 
 # get floor shadow catcher
-floor = mesh.getFloor()
+floor = mesh.getFloor(shadow_catcher=False, size=(10, 10))
+
+# add color and material to floor
+floor.material.setColor((0.5, 0.5, 0.5, 1))
+floor.material.setRoughness(0.5)
 
 # get camera centered on mesh
 camera = mesh.getCamera(azimuth=70 * np.pi/180, elevation=20 * np.pi/180, distance=2.5)
