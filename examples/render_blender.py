@@ -9,8 +9,8 @@ from Py3DRF import Mesh
 from Py3DRF import Location, Rotation, Scale
 
 # Data load
-#suzanne = o3d.io.read_triangle_mesh('s0677_vertebrae_L3.nii.g_1.stl')
-suzanne = o3d.io.read_triangle_mesh('smooth_suzanne.obj')
+suzanne = o3d.io.read_triangle_mesh('s0677_vertebrae_L3.nii.g_1.stl')
+#suzanne = o3d.io.read_triangle_mesh('smooth_suzanne.obj')
 
 # Convert to array and switch from y-up to z-up
 V = np.asarray(suzanne.vertices)
@@ -18,14 +18,19 @@ V = np.column_stack((V[:, 0], V[:, 2], V[:, 1]))
 F = np.asarray(suzanne.triangles)
 
 # Generate attributes
-float_attr = V[:, 2]
-color_attr = np.hstack((V, np.ones((V.shape[0], 1))))
+#float_attr = V[:, 2]
+
+xyz = V
+xyz_norm = (xyz - xyz.min(axis=0)) / (xyz.max(axis=0) - xyz.min(axis=0))
+float_attr = xyz_norm[:, 2]
+color_attr = np.hstack((xyz_norm, np.ones((V.shape[0], 1))))
+#color_attr = np.hstack((V, np.ones((V.shape[0], 1))))
 
 # Init scene
 scene = Scene(resolution=(1080, 1080), engine="CYCLES", deafult_sun=True, transparent=False)
 
 # Init mesh
-mesh = Mesh("Suzanne", V, [], F, scale=Scale(0.1, 0.1, 0.1))
+mesh = Mesh("Suzanne", V, [], F, scale=Scale(0.01, 0.01, 0.01), location=Location(0, 0, 0))
 
 # Link attributes to mesh
 mesh.addColorAttribute(color_attr, "color_attr")
@@ -33,7 +38,7 @@ mesh.addFloatAttribute(float_attr, "float_attr")
 
 # Link mesh attributes to material
 mesh.material.setColorAttributeAsColor("color_attr")
-mesh.material.setFloatAttributeAsEmissionColor("float_attr")
+#mesh.material.setFloatAttributeAsEmissionColor("float_attr")
 #mesh.material.setEmissionStrength(10)
 
 # shade smooth
@@ -41,6 +46,8 @@ mesh.setShadeSmooth()
 
 # use render as pointclouds
 #mesh.asPointCloud()
+# thickness is the diameter of the edge cylinders, in the mesh's local units
+mesh.asWireframe(thickness=0.1)
 
 # get floor shadow catcher
 floor = mesh.getFloor(shadow_catcher=False, size=(10, 10))

@@ -13,6 +13,7 @@ from .lights import SunLight
 from .materials import Material
 from .mesh import Mesh
 from .pointcloud import PointCloudSettings, MeshToPointCloudNodeTree
+from .wireframe import WireFrameSettings
 
 __all__ = [
     "Camera",
@@ -20,5 +21,6 @@ __all__ = [
     "Material",
     "Mesh",
     "PointCloudSettings",
+    "WireFrameSettings",
     "MeshToPointCloudNodeTree",
 ]
