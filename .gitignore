@@ -1,2 +1,6 @@
 *.pyc
 *.png
+*.html
+*.stl
+*.ini
+*.usda

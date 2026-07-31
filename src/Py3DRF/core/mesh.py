@@ -1,11 +1,16 @@
+import logging
+
 import numpy as np
 
 from .materials import Material
 from .camera import Camera
 from .pointcloud import PointCloudSettings
+from .wireframe import WireFrameSettings
 from .types import Location
 from .types import Rotation
 from .types import Scale
+
+logger = logging.getLogger(__name__)
 
 class Mesh:
     """
@@ -53,6 +58,7 @@ class Mesh:
         self.float_attributes = {}
         self.color_attributes = {}
         self.point_cloud_settings = None
+        self.wireframe_settings = None
         self.is_shadow_catcher = False
 
         if material is None:
@@ -121,6 +127,26 @@ class Mesh:
         world = (matrix @ homogeneous.T).T
         return world[:, :3]
 
+    def _edgePairs(self):
+        """
+        :return: (E, 2) int numpy array of unique undirected vertex-index edges: self.edges
+            if explicitly provided, otherwise inferred from self.faces (each face's
+            consecutive vertex pairs, wrapping around, deduplicated).
+        """
+        if len(self.edges) > 0:
+            return np.asarray(self.edges, dtype=int)
+
+        pairs = set()
+        for face in self.faces:
+            n = len(face)
+            for k in range(n):
+                a, b = int(face[k]), int(face[(k + 1) % n])
+                pairs.add((a, b) if a < b else (b, a))
+
+        if not pairs:
+            return np.zeros((0, 2), dtype=int)
+        return np.array(sorted(pairs), dtype=int)
+
     def getMinZ(self):
         """
         Get the min Z value.
@@ -144,6 +170,54 @@ class Mesh:
         if len(world) == 0:
             return -float('inf')
         return float(world[:, 2].max())
+
+    def getMinX(self):
+        """
+        Get the min X value.
+
+        :return: The min X coordinate of the set of points.
+
+        """
+        world = self._worldVertices()
+        if len(world) == 0:
+            return float('inf')
+        return float(world[:, 0].min())
+
+    def getMaxX(self):
+        """
+        Get the max X value.
+
+        :return: The max X coordinate of the set of points.
+
+        """
+        world = self._worldVertices()
+        if len(world) == 0:
+            return -float('inf')
+        return float(world[:, 0].max())
+
+    def getMinY(self):
+        """
+        Get the min Y value.
+
+        :return: The min Y coordinate of the set of points.
+
+        """
+        world = self._worldVertices()
+        if len(world) == 0:
+            return float('inf')
+        return float(world[:, 1].min())
+
+    def getMaxY(self):
+        """
+        Get the max Y value.
+
+        :return: The max Y coordinate of the set of points.
+
+        """
+        world = self._worldVertices()
+        if len(world) == 0:
+            return -float('inf')
+        return float(world[:, 1].max())
 
     def setLocation(self, location=Location(0, 0, 0)):
         """
@@ -205,7 +279,7 @@ class Mesh:
 
         """
         camera = Camera()
-        camera.focusOnPoint(self.location, azimuth, elevation, distance)
+        camera.focusOnPoint(Location((self.getMinX()+self.getMaxX())/2, (self.getMinY()+self.getMaxY())/2, (self.getMinZ()+self.getMaxZ())/2), azimuth, elevation, distance)
         return camera
 
     def setMaterial(self, material: Material):
@@ -228,7 +302,9 @@ class Mesh:
 
     def asPointCloud(self, name="Pointcloud", radius=0.01, subdivison=3, material: Material = None):
         """
-        Set rendering as pointcloud.
+        Set rendering as pointcloud. Point cloud and wireframe rendering are mutually
+        exclusive: this clears any wireframe_settings previously applied via asWireframe(),
+        since no backend can meaningfully render both at once.
 
         :param name: Name of the Blender modifier created.
         :param radius: Radius of the rendered pointclouds.
@@ -241,4 +317,38 @@ class Mesh:
             material = self.material
 
         self.point_cloud_settings = PointCloudSettings(name=name, radius=radius, subdivison=subdivison, material=material)
+        if self.wireframe_settings is not None:
+            # point cloud and wireframe are mutually exclusive: clear the wireframe settings
+            logger.warning("Mesh.asPointCloud() called after Mesh.asWireframe(); clearing wireframe settings.")
+        self.wireframe_settings = None
         return self.point_cloud_settings
+
+    def asWireframe(self, name="Wireframe", thickness=0.01, resolution=12, material: Material = None, hide_surface=True):
+        """
+        Set rendering as wireframe: the mesh's faces are hidden and each of its edges is
+        highlighted -- as a 3D cylinder or a flat screen-space line, depending on the
+        backend (see Py3DRF.core.wireframe.WireFrameSettings). Point cloud and wireframe
+        rendering are mutually exclusive: this clears any point_cloud_settings previously
+        applied via asPointCloud(), since no backend can meaningfully render both at once.
+
+        :param name: Name of the Blender modifier, or the Plotly/Polyscope trace/structure,
+            created.
+        :param thickness: Girth of the wireframe edges: a real 3D diameter on Blender, a
+            heuristically-scaled pixel line width on Plotly/Polyscope.
+        :param resolution: Number of sides of the edge cylinders. Blender-only.
+        :param material: Material object to link to the wireframe.
+        :param hide_surface: If True (default), only the wireframe edges are rendered; if
+            False, the solid shaded mesh is rendered as well, with the edges on top.
+            Polyscope cannot honor True and raises NotSupportedByBackendError instead.
+        :return: The WireframeSettings describing the wireframe rendering.
+
+        """
+        if material is None and self.material is not None:
+            material = self.material
+
+        self.wireframe_settings = WireFrameSettings(name=name, thickness=thickness, resolution=resolution, material=material, hide_surface=hide_surface)
+        if self.point_cloud_settings is not None:
+            # point cloud and wireframe are mutually exclusive: clear the point cloud settings
+            logger.warning("Mesh.asWireframe() called after Mesh.asPointCloud(); clearing point cloud settings.")
+        self.point_cloud_settings = None
+        return self.wireframe_settings

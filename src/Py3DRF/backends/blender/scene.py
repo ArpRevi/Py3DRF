@@ -3,7 +3,7 @@ SceneBlender: the Blender (bpy) backend for Py3DRF.
 
 This is the only module in Py3DRF.backends.blender that imports bpy. It
 translates Py3DRF.core objects (Camera, Mesh, SunLight, Material,
-PointCloudSettings) into actual Blender data-blocks.
+PointCloudSettings, WireFrameSettings) into actual Blender data-blocks.
 
 Do not import this module directly -- go through the Scene facade
 (Py3DRF.Scene(backend="blender", ...)), which loads it lazily.
@@ -17,6 +17,7 @@ from ...core.lights import SunLight
 from ...core.materials import Material
 from ...core.mesh import Mesh
 from ...core.pointcloud import PointCloudSettings
+from ...core.wireframe import WireFrameSettings
 from ..base import SceneBackend
 from ...core.types import Location, Rotation, Scale
 
@@ -238,7 +239,7 @@ class SceneBlender(SceneBackend):
     def _buildMeshObject(self, mesh: Mesh):
         """
         Build a bpy.types.Object wrapping a bpy.types.Mesh from a Mesh, including its
-        attributes, material, shading and optional point-cloud modifier.
+        attributes, material, shading and optional point-cloud/wireframe modifier.
         """
         data = bpy.data.meshes.new(name=mesh.name)
         data.from_pydata(mesh.vertices, mesh.edges, mesh.faces)
@@ -271,6 +272,11 @@ class SceneBlender(SceneBackend):
         if mesh.point_cloud_settings is not None:
             node_tree = self._buildPointCloudNodeTree(mesh.point_cloud_settings)
             modifier = obj.modifiers.new(mesh.point_cloud_settings.name, 'NODES')
+            modifier.node_group = node_tree
+
+        if mesh.wireframe_settings is not None:
+            node_tree = self._buildWireframeNodeTree(mesh.wireframe_settings)
+            modifier = obj.modifiers.new(mesh.wireframe_settings.name, 'NODES')
             modifier.node_group = node_tree
 
         return obj
@@ -412,5 +418,96 @@ class SceneBlender(SceneBackend):
         if settings.material is not None:
             bl_material = self._buildMaterial(settings.material)
             nodes['setMaterial'].inputs['Material'].default_value = bl_material
+
+        return node_group
+
+
+    def _buildWireframeNodeTree(self, settings: WireFrameSettings):
+        """
+        Build the bpy.types.GeometryNodeTree (Mesh to Curve -> Curve to Mesh along a circle
+        profile) corresponding to a WireFrameSettings.
+
+        Mesh to Curve keeps only the mesh's edges, discarding its faces, and Curve to Mesh
+        then sweeps a circular profile along each of them -- so every edge comes out as a
+        real 3D cylinder and the surface is gone. That "faces are hidden" is a consequence
+        of how the geometry is built, not a material trick: nothing is left to render but
+        the tubes.
+
+        The tube radius is the product of two things Curve to Mesh multiplies together: the
+        profile circle's own radius, fixed at 0.5 here (i.e. a unit-diameter profile), and
+        Curve to Mesh's 'Scale' input, which is where settings.thickness is applied. That
+        way thickness reads as the cylinder's diameter -- its girth -- and the same socket
+        serves both the constant and the attribute-driven case, since 'Scale' is a field
+        and so accepts a named attribute just as well as a constant.
+
+        ('Scale' is deliberately the socket used here rather than a Set Curve Radius node
+        feeding the curve's radius attribute: as of Blender 4.0 Curve to Mesh scales the
+        profile by this input, and no longer picks the radius attribute up implicitly, so
+        the Set Curve Radius route silently produces tubes of the wrong girth.)
+
+        Note that a previous version of this method rendered the wireframe with Blender's
+        Freestyle NPR system instead, which draws screen-space lines whose thickness is in
+        pixels. These cylinders are ordinary geometry: they shade, cast and receive
+        shadows, and shrink with distance, and their thickness is in the mesh's local units
+        (so the parent mesh's scale applies to them, as it does to the mesh itself).
+
+        :param settings: WireFrameSettings describing the wireframe.
+        :return: The created bpy.types.GeometryNodeTree.
+
+        """
+        node_group = bpy.data.node_groups.new(type="GeometryNodeTree", name=settings.name)
+        node_group.nodes.clear()
+        nodes = {}
+        links = {}
+
+        nodes['input'] = node_group.nodes.new(type="NodeGroupInput")
+        nodes['output'] = node_group.nodes.new(type="NodeGroupOutput")
+        nodes['meshToCurve'] = node_group.nodes.new(type="GeometryNodeMeshToCurve")
+        nodes['profileCircle'] = node_group.nodes.new(type="GeometryNodeCurvePrimitiveCircle")
+        nodes['curveToMesh'] = node_group.nodes.new(type="GeometryNodeCurveToMesh")
+        nodes['setShadeSmooth'] = node_group.nodes.new(type="GeometryNodeSetShadeSmooth")
+        nodes['setMaterial'] = node_group.nodes.new(type="GeometryNodeSetMaterial")
+
+        node_group.interface.new_socket(name="Geometry", description="", in_out="INPUT", socket_type="NodeSocketGeometry")
+        node_group.interface.new_socket(name="Geometry", description="", in_out="OUTPUT", socket_type="NodeSocketGeometry")
+
+        links['inputToMeshToCurve'] = node_group.links.new(nodes['input'].outputs['Geometry'], nodes['meshToCurve'].inputs['Mesh'])
+        links['meshToCurveToCurveToMesh'] = node_group.links.new(nodes['meshToCurve'].outputs['Curve'], nodes['curveToMesh'].inputs['Curve'])
+        links['profileCircleToCurveToMesh'] = node_group.links.new(nodes['profileCircle'].outputs['Curve'], nodes['curveToMesh'].inputs['Profile Curve'])
+        links['curveToMeshToSetShadeSmooth'] = node_group.links.new(nodes['curveToMesh'].outputs['Mesh'], nodes['setShadeSmooth'].inputs['Geometry'])
+        links['setShadeSmoothToSetMaterial'] = node_group.links.new(nodes['setShadeSmooth'].outputs['Geometry'], nodes['setMaterial'].inputs['Geometry'])
+
+        # A unit-diameter profile, so the 'Scale' input below carries the thickness on its
+        # own (see the docstring).
+        nodes['profileCircle'].inputs['Radius'].default_value = 0.5
+        nodes['profileCircle'].inputs['Resolution'].default_value = settings.resolution
+
+        # Close the ends of the tubes. Mesh to Curve breaks the edge network into separate
+        # splines wherever more than two edges meet at a vertex, so on anything but a
+        # simple closed loop the tubes genuinely have open ends to cap.
+        nodes['curveToMesh'].inputs['Fill Caps'].default_value = True
+
+        if settings.thickness_attribute is not None:
+            nodes['thicknessAttribute'] = node_group.nodes.new(type="GeometryNodeInputNamedAttribute")
+            nodes['thicknessAttribute'].data_type = 'FLOAT'
+            nodes['thicknessAttribute'].inputs['Name'].default_value = settings.thickness_attribute
+            links['thicknessAttributeToCurveToMesh'] = node_group.links.new(nodes['thicknessAttribute'].outputs['Attribute'], nodes['curveToMesh'].inputs['Scale'])
+        else:
+            nodes['curveToMesh'].inputs['Scale'].default_value = settings.thickness
+
+        if settings.material is not None:
+            bl_material = self._buildMaterial(settings.material)
+            nodes['setMaterial'].inputs['Material'].default_value = bl_material
+
+        if settings.hide_surface:
+            links['setMaterialToOutput'] = node_group.links.new(nodes['setMaterial'].outputs['Geometry'], nodes['output'].inputs['Geometry'])
+        else:
+            # Keep the shaded surface as well, by adding the untouched incoming mesh back
+            # alongside the tubes. It keeps the material assigned to the mesh data-block;
+            # only the tubes get settings.material.
+            nodes['joinGeometry'] = node_group.nodes.new(type="GeometryNodeJoinGeometry")
+            links['setMaterialToJoinGeometry'] = node_group.links.new(nodes['setMaterial'].outputs['Geometry'], nodes['joinGeometry'].inputs['Geometry'])
+            links['inputToJoinGeometry'] = node_group.links.new(nodes['input'].outputs['Geometry'], nodes['joinGeometry'].inputs['Geometry'])
+            links['joinGeometryToOutput'] = node_group.links.new(nodes['joinGeometry'].outputs['Geometry'], nodes['output'].inputs['Geometry'])
 
         return node_group
