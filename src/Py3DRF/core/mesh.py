@@ -1,3 +1,5 @@
+import logging
+
 import numpy as np
 
 from .materials import Material
@@ -7,6 +9,8 @@ from .wireframe import WireFrameSettings
 from .types import Location
 from .types import Rotation
 from .types import Scale
+
+logger = logging.getLogger(__name__)
 
 class Mesh:
     """
@@ -313,6 +317,9 @@ class Mesh:
             material = self.material
 
         self.point_cloud_settings = PointCloudSettings(name=name, radius=radius, subdivison=subdivison, material=material)
+        if self.wireframe_settings is not None:
+            # point cloud and wireframe are mutually exclusive: clear the wireframe settings
+            logger.warning("Mesh.asPointCloud() called after Mesh.asWireframe(); clearing wireframe settings.")
         self.wireframe_settings = None
         return self.point_cloud_settings
 
@@ -340,5 +347,8 @@ class Mesh:
             material = self.material
 
         self.wireframe_settings = WireFrameSettings(name=name, thickness=thickness, resolution=resolution, material=material, hide_surface=hide_surface)
+        if self.point_cloud_settings is not None:
+            # point cloud and wireframe are mutually exclusive: clear the point cloud settings
+            logger.warning("Mesh.asWireframe() called after Mesh.asPointCloud(); clearing point cloud settings.")
         self.point_cloud_settings = None
         return self.wireframe_settings
