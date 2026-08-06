@@ -10,7 +10,7 @@ plotly, polyscope, ...). Only Scene(backend=...) triggers loading the one
 backend you asked for; see Py3DRF.backends for details.
 """
 
-from .core import Camera, SunLight, Material, Mesh, PointCloudSettings
+from .core import Camera, SunLight, Material, Mesh, PointCloudSettings, MeshToPointCloudNodeTree, WireFrameSettings
 from .scene import Scene
 from .backends import available_backends
 from .backends.base import NotSupportedByBackendError
@@ -23,6 +23,8 @@ __all__ = [
     "Material",
     "Mesh",
     "PointCloudSettings",
+    "MeshToPointCloudNodeTree",
+    "WireFrameSettings",
     "available_backends",
     "NotSupportedByBackendError",
     "Location",

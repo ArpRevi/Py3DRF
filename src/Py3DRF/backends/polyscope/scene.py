@@ -2,8 +2,8 @@
 ScenePolyscope: the Polyscope backend for Py3DRF.
 
 This is the only module in Py3DRF.backends.polyscope that imports polyscope.
-It translates Py3DRF.core objects (Camera, Mesh, Material, PointCloudSettings)
-into structures registered on a polyscope session.
+It translates Py3DRF.core objects (Camera, Mesh, Material, PointCloudSettings,
+WireFrameSettings) into structures registered on a polyscope session.
 
 Do not import this module directly -- go through the Scene facade
 (Py3DRF.Scene(backend="polyscope", ...)), which loads it lazily.
@@ -26,6 +26,16 @@ than faked -- calling them raises NotSupportedByBackendError):
     arbitrary user-supplied gradient, so the ramp colors are approximated
     with the closest built-in colormap ("viridis") rather than reproduced
     exactly.
+  * WireFrameSettings.thickness_attribute: a surface mesh's edge_width is a
+    single scalar for the whole structure, not a per-vertex one, so
+    attribute-driven thickness is rejected rather than approximated.
+  * WireFrameSettings.hide_surface=True: Polyscope's edge rendering is an
+    overlay tied to the surface mesh's own draw call, and the surface's
+    transparency also suppresses that overlay -- verified empirically, even a
+    transparency near 0 blanks the edges along with the faces, and does not
+    stop the (now-invisible) surface from occluding whatever is behind it.
+    There is no public API to decouple "surface hidden" from "edges drawn" on
+    a SurfaceMesh, so hide_surface=True is rejected rather than faked.
 
 Polyscope keeps a single global session (it isn't one-object-per-scene like
 Blender or Plotly), so only one ScenePolyscope should be "live" at a time;
@@ -39,6 +49,7 @@ from ...core.camera import Camera
 from ...core.lights import SunLight
 from ...core.materials import Material
 from ...core.mesh import Mesh
+from ...core.wireframe import WireFrameSettings
 from ..base import SceneBackend, NotSupportedByBackendError
 
 _DEFAULT_COLORMAP = "viridis"
@@ -76,27 +87,30 @@ class ScenePolyscope(SceneBackend):
 
     def addCamera(self, camera: Camera):
         """
-        Point the Polyscope view at the origin from a Camera's location.
+        Point the Polyscope view at a Camera's target from its location.
 
-        Polyscope's look_at(location, target) is an absolute-position camera,
-        unlike Plotly's relative eye/center, but still has no equivalent of
-        Blender's focal length or object rotation, so only `camera.location`
-        is used, looking at the origin. `camera.rotation` and
-        `camera.focal_length` are ignored.
+        Polyscope's look_at(location, target) is an absolute-position camera, unlike
+        Plotly's relative eye/center, but still has no equivalent of Blender's focal
+        length or object rotation, so only `camera.location` and `camera.target` are
+        used. `camera.rotation` and `camera.focal_length` are ignored -- `camera.target`
+        (defaulting to the origin, but set to the actual focus point by
+        Camera.focusOnPoint()) is what look_at needs instead of a rotation.
 
         :param camera: Camera object.
         :return: The (location, target) tuple that was applied to the view.
 
         """
         location = camera.location.to_tuple()
-        target = (0.0, 0.0, 0.0)
+        target = camera.target.to_tuple()
         ps.look_at(location, target)
         return (location, target)
 
     def addObject(self, object):
         """
-        Add a Mesh to the session as a Polyscope surface mesh (or point cloud,
-        when the mesh has point-cloud settings applied via asPointCloud()).
+        Add a Mesh to the session as a Polyscope surface mesh (or point cloud, when
+        the mesh has point-cloud settings applied via asPointCloud(), or a surface
+        mesh with a screen-space wireframe overlay, when the mesh has wireframe
+        settings applied via asWireframe()).
 
         :param object: Mesh object to add to the scene. SunLight is not
             supported (see module docstring) and raises
@@ -113,6 +127,8 @@ class ScenePolyscope(SceneBackend):
         if not isinstance(object, Mesh):
             raise TypeError(f"Cannot add object of type {type(object).__name__} to the scene.")
 
+        if object.wireframe_settings is not None:
+            return self._registerWireframe(object)
         if object.point_cloud_settings is not None:
             return self._registerPointCloud(object)
         return self._registerSurfaceMesh(object)
@@ -145,6 +161,61 @@ class ScenePolyscope(SceneBackend):
             faces,
             smooth_shade=mesh.shade_smooth,
             transparency=0.3 if mesh.is_shadow_catcher else 1.0,
+        )
+        self._applyMaterial(structure, mesh, mesh.material)
+        return structure
+
+    def _registerWireframe(self, mesh: Mesh):
+        """
+        Build a polyscope SurfaceMesh with its edge overlay enabled (edge_width /
+        edge_color): this is a genuine screen-space wireframe -- edges draw at a
+        constant apparent pixel width regardless of camera distance, verified
+        empirically -- rather than the 3D tube geometry the Blender backend builds
+        for the same WireFrameSettings. Unlike Blender's cylinder-based wireframe,
+        the faces are NOT hidden here: see the module docstring for why
+        hide_surface=True has no honest equivalent in Polyscope's public API.
+
+        :param mesh: Mesh with wireframe_settings applied via asWireframe().
+        :return: The registered SurfaceMesh, with its edge overlay enabled.
+
+        """
+        settings: WireFrameSettings = mesh.wireframe_settings
+
+        if settings.thickness_attribute is not None:
+            raise NotSupportedByBackendError(
+                "ScenePolyscope's wireframe rendering doesn't support per-vertex "
+                "attribute-driven thickness: a surface mesh's edge_width is a "
+                "single scalar for the whole structure, not a per-vertex one. Use "
+                "a constant settings.thickness (via setWireframeThickness) instead."
+            )
+
+        if settings.hide_surface:
+            raise NotSupportedByBackendError(
+                "ScenePolyscope can't hide a mesh's surface while keeping its edges "
+                "visible: edge rendering is an overlay tied to the surface mesh's "
+                "own draw call, and lowering the surface's transparency to hide it "
+                "suppresses the edge overlay too (verified empirically -- even a "
+                "transparency near 0 blanks both). Call asWireframe(hide_surface="
+                "False) to draw the wireframe as edges over the shaded surface "
+                "instead."
+            )
+
+        vertices = mesh._worldVertices()
+        faces = np.asarray(mesh.faces)
+        material = settings.material if settings.material is not None else mesh.material
+
+        structure = ps.register_surface_mesh(
+            mesh.name,
+            vertices,
+            faces,
+            smooth_shade=mesh.shade_smooth,
+            transparency=0.3 if mesh.is_shadow_catcher else 1.0,
+            # Real-world diameter -> Polyscope's edge_width, a genuinely screen-space
+            # (constant apparent pixel width, verified empirically) quantity: the
+            # same heuristic scaling the Plotly backend applies to its line width,
+            # since neither has a literal 3D-diameter equivalent.
+            edge_width=max(0.5, settings.thickness * 400),
+            edge_color=tuple(material.color[:3]),
         )
         self._applyMaterial(structure, mesh, mesh.material)
         return structure

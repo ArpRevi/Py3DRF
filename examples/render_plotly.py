@@ -39,11 +39,23 @@ mesh2 = Mesh("SuzannePoints", V, [], F, scale=Scale(0.5, 0.5, 0.5))
 mesh2.addFloatAttribute(float_attr, "float_attr")
 mesh2.material.setFloatAttributeAsColor("float_attr", colors=[(0, 0, 1, 1), (1, 0, 0, 1)])
 mesh2.asPointCloud(radius=0.02)
+mesh2.asWireframe(thickness=0.03)  # should be ignored by the point-cloud path
 
 scene2 = Scene(backend="plotly", resolution=(800, 800))
 scene2.addObject(mesh2)
 scene2.renderToFile(os.path.join(os.getcwd(), "output_plotly_points.html"))
 print("plotly point cloud render ok")
+
+# also exercise the wireframe path: a genuine screen-space line wireframe (constant
+# pixel width, not a 3D tube like the Blender backend builds), faces fully hidden
+mesh3 = Mesh("SuzanneWireframe", V, [], F, scale=Scale(0.01, 0.01, 0.01))
+mesh3.material.setColor((0.9, 0.1, 0.1, 1))
+mesh3.asWireframe(thickness=0.03)
+
+scene3 = Scene(backend="plotly", resolution=(800, 800))
+scene3.addObject(mesh3)
+scene3.renderToFile(os.path.join(os.getcwd(), "output_plotly_wireframe.html"))
+print("plotly wireframe render ok")
 
 # a method Plotly genuinely doesn't support should raise, not silently pass
 try:
