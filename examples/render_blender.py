@@ -47,7 +47,8 @@ mesh.setShadeSmooth()
 # use render as pointclouds
 #mesh.asPointCloud()
 # thickness is the diameter of the edge cylinders, in the mesh's local units
-mesh.asWireframe(thickness=0.1)
+#mesh.asPointCloud(radius=1)
+
 
 # get floor shadow catcher
 floor = mesh.getFloor(shadow_catcher=False, size=(10, 10))

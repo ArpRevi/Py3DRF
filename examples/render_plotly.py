@@ -39,6 +39,7 @@ mesh2 = Mesh("SuzannePoints", V, [], F, scale=Scale(0.5, 0.5, 0.5))
 mesh2.addFloatAttribute(float_attr, "float_attr")
 mesh2.material.setFloatAttributeAsColor("float_attr", colors=[(0, 0, 1, 1), (1, 0, 0, 1)])
 mesh2.asPointCloud(radius=0.02)
+mesh2.asWireframe(thickness=0.03)  # should be ignored by the point-cloud path
 
 scene2 = Scene(backend="plotly", resolution=(800, 800))
 scene2.addObject(mesh2)

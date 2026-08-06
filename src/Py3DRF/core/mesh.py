@@ -298,7 +298,9 @@ class Mesh:
 
     def asPointCloud(self, name="Pointcloud", radius=0.01, subdivison=3, material: Material = None):
         """
-        Set rendering as pointcloud.
+        Set rendering as pointcloud. Point cloud and wireframe rendering are mutually
+        exclusive: this clears any wireframe_settings previously applied via asWireframe(),
+        since no backend can meaningfully render both at once.
 
         :param name: Name of the Blender modifier created.
         :param radius: Radius of the rendered pointclouds.
@@ -311,13 +313,16 @@ class Mesh:
             material = self.material
 
         self.point_cloud_settings = PointCloudSettings(name=name, radius=radius, subdivison=subdivison, material=material)
+        self.wireframe_settings = None
         return self.point_cloud_settings
 
     def asWireframe(self, name="Wireframe", thickness=0.01, resolution=12, material: Material = None, hide_surface=True):
         """
         Set rendering as wireframe: the mesh's faces are hidden and each of its edges is
         highlighted -- as a 3D cylinder or a flat screen-space line, depending on the
-        backend (see Py3DRF.core.wireframe.WireFrameSettings).
+        backend (see Py3DRF.core.wireframe.WireFrameSettings). Point cloud and wireframe
+        rendering are mutually exclusive: this clears any point_cloud_settings previously
+        applied via asPointCloud(), since no backend can meaningfully render both at once.
 
         :param name: Name of the Blender modifier, or the Plotly/Polyscope trace/structure,
             created.
@@ -335,4 +340,5 @@ class Mesh:
             material = self.material
 
         self.wireframe_settings = WireFrameSettings(name=name, thickness=thickness, resolution=resolution, material=material, hide_surface=hide_surface)
+        self.point_cloud_settings = None
         return self.wireframe_settings
