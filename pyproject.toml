@@ -15,7 +15,8 @@ dependencies = [
 blender = ["bpy>=4.0"]
 plotly = ["plotly", "kaleido"]
 polyscope = ["polyscope"]
-all = ["Py3DRF[blender,plotly,polyscope]"]
+usd = ["usd-core"]
+all = ["Py3DRF[blender,plotly,polyscope,usd]"]
 
 [tool.setuptools.packages.find]
 where = ["src"]

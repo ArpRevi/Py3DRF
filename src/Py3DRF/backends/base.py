@@ -109,6 +109,14 @@ class SceneBackend:
         """Save the native project/session file, for backends with a serializable project format."""
         raise NotSupportedByBackendError(self._msg("saveToFile"))
 
+    def exportToFile(self, filepath):
+        """
+        Export the scene description itself to filepath, for backends whose native
+        output is a scene-description file rather than a rendered image (e.g. USD's
+        .usda). Unlike renderToFile, this does not rasterize or path-trace anything.
+        """
+        raise NotSupportedByBackendError(self._msg("exportToFile"))
+
     # ------------------------------------------------------------------
 
     def _msg(self, name):

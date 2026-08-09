@@ -48,13 +48,18 @@ class Scene:
     Swapping to another backend is a one-argument change:
         scene = Scene(backend="plotly", resolution=(1080, 1080))
 
-    Any keyword arguments beyond `backend` are forwarded to the backend's
-    own constructor, so they vary per backend (see each backend's
-    SceneBackend subclass for what it accepts).
+    Any keyword arguments beyond `backend` and `allow_backend_conflict` are
+    forwarded to the backend's own constructor, so they vary per backend (see
+    each backend's SceneBackend subclass for what it accepts).
+
+    Some backend pairs (e.g. "blender" and "usd") bundle third-party packages
+    known to conflict when both are imported into the same process. Loading
+    one after the other's package is already imported raises
+    BackendConflictError; pass allow_backend_conflict=True to proceed anyway.
     """
 
-    def __init__(self, backend="blender", **kwargs):
-        backend_cls = load_backend_class(backend)
+    def __init__(self, backend="blender", allow_backend_conflict=False, **kwargs):
+        backend_cls = load_backend_class(backend, allow_backend_conflict=allow_backend_conflict)
         self._impl = backend_cls(**kwargs)
         self.backend_name = backend
 
