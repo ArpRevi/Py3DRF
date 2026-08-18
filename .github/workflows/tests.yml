@@ -45,6 +45,11 @@ jobs:
           # locally -- test_real_mri_data.py is pointed at it via
           # PY3DRF_TESTDATA_DIR below instead of assuming a fixed layout.
           path: Py3DRF_testdata
+          # The .nii/.obj files in this repo are tracked via Git LFS;
+          # without this, checkout leaves LFS pointer text files in place
+          # instead of the real binary content, and nibabel/open3d can't
+          # parse those.
+          lfs: true
 
       - uses: actions/setup-python@v5
         with:
