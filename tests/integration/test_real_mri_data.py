@@ -1,3 +1,4 @@
+import os
 from pathlib import Path
 
 import numpy as np
@@ -6,13 +7,21 @@ import pytest
 from Py3DRF import Scene, Mesh
 from Py3DRF.io import load_nifti
 
-_TESTDATA_ROOT = Path(__file__).resolve().parents[3] / "Py3DRF_testdata"
+# PY3DRF_TESTDATA_DIR lets CI point at wherever it actually checked out
+# Py3DRF_testdata: GitHub's actions/checkout refuses a `path` outside
+# $GITHUB_WORKSPACE, so a true sibling checkout (this repo's own local dev
+# convention -- Py3DRF_testdata next to Py3DRF on disk) isn't possible there.
+# Locally, with no env var set, the sibling-directory default below is used.
+_TESTDATA_ROOT = Path(
+    os.environ.get("PY3DRF_TESTDATA_DIR")
+    or (Path(__file__).resolve().parents[3] / "Py3DRF_testdata")
+)
 _NII_PATH = _TESTDATA_ROOT / "brain-scan" / "NII" / "ATE23_seg_1mm_Crop_relabelled_merged.nii"
 _OBJ_PATH = _TESTDATA_ROOT / "brain-scan" / "segment_02.obj"
 
 pytestmark = pytest.mark.skipif(
     not (_NII_PATH.exists() and _OBJ_PATH.exists()),
-    reason="Py3DRF_testdata not checked out next to this repo (private repo, needs CI's TESTDATA_TOKEN, or a local sibling checkout)",
+    reason="Py3DRF_testdata not found (set PY3DRF_TESTDATA_DIR, or check it out as a local sibling of this repo)",
 )
 
 

@@ -40,7 +40,11 @@ jobs:
         with:
           repository: ArpRevi/Py3DRF_testdata
           token: ${{ secrets.TESTDATA_TOKEN }}
-          path: ../Py3DRF_testdata
+          # actions/checkout refuses a `path` outside $GITHUB_WORKSPACE, so
+          # this lands as a subdirectory rather than the sibling layout used
+          # locally -- test_real_mri_data.py is pointed at it via
+          # PY3DRF_TESTDATA_DIR below instead of assuming a fixed layout.
+          path: Py3DRF_testdata
 
       - uses: actions/setup-python@v5
         with:
@@ -51,4 +55,6 @@ jobs:
         run: pip install -e ".[test,testdata,plotly,usd,mri]"
 
       - name: Run real-data integration test
+        env:
+          PY3DRF_TESTDATA_DIR: ${{ github.workspace }}/Py3DRF_testdata
         run: pytest tests/integration/ -v
