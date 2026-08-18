@@ -1,0 +1,54 @@
+name: Tests
+
+on:
+  push:
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.10", "3.12"]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+
+      - name: Install Py3DRF with test-relevant extras
+        run: pip install -e ".[test,plotly,polyscope,usd,mri]"
+
+      - name: Run tests
+        run: pytest tests/ -v
+
+  integration:
+    runs-on: ubuntu-latest
+    # Secrets aren't available to workflow runs triggered by PRs from forks
+    # (GitHub strips them for security), so skip this job entirely there
+    # rather than let it fail on a missing/unusable token.
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Checkout Py3DRF_testdata (private)
+        uses: actions/checkout@v4
+        with:
+          repository: ArpRevi/Py3DRF_testdata
+          token: ${{ secrets.TESTDATA_TOKEN }}
+          path: ../Py3DRF_testdata
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install Py3DRF with test-relevant extras
+        run: pip install -e ".[test,testdata,plotly,usd,mri]"
+
+      - name: Run real-data integration test
+        run: pytest tests/integration/ -v
