@@ -115,6 +115,36 @@ def test_get_slice_uses_base_color_attribute_not_emission():
     assert mesh.material.emission_color_attribute is None
 
 
+def test_get_slice_face_winding_is_consistent_across_all_axes():
+    # Regression test: coronal's (free0, free1, dim) grid-axis assignment is an
+    # odd permutation of (0, 1, 2), unlike axial/sagittal's even ones, so its
+    # quad winding came out flipped -- its face normal pointed exactly
+    # opposite to SliceSelection.normal (and to the other two orientations'),
+    # leaving it unlit from light directions that correctly lit sagittal/axial.
+    # A non-trivial (rotated) affine is used since the bug is about
+    # orientation/permutation, not about any specific affine's values -- a
+    # clean, exactly-orthonormal rotation (not a hand-copied approximation)
+    # so any mismatch here reflects a real sign flip, not affine imprecision.
+    angle = 6 * np.pi / 180
+    c, s = np.cos(angle), np.sin(angle)
+    rotation = np.array([[c, -s, 0], [s, c, 0], [0, 0, 1]])
+    affine = np.eye(4)
+    affine[:3, :3] = rotation
+    volume = NiftiVolume(np.random.rand(6, 6, 6), affine)
+
+    for axis in ("sagittal", "coronal", "axial"):
+        selection = volume.selectionFor(axis, 3)
+        mesh = volume.getSlice(selection)
+        world = mesh._worldVertices()
+
+        face = mesh.faces[len(mesh.faces) // 2]
+        v0, v1, v2 = world[face[0]], world[face[1]], world[face[2]]
+        face_normal = np.cross(v1 - v0, v2 - v0)
+        face_normal = face_normal / np.linalg.norm(face_normal)
+
+        np.testing.assert_allclose(face_normal, selection.normal, atol=1e-6, err_msg=axis)
+
+
 def test_load_nifti_round_trip(tmp_path):
     nib = pytest.importorskip("nibabel")
 

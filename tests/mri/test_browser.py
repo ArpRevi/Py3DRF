@@ -6,8 +6,9 @@ matplotlib.use("Agg")
 
 import matplotlib.pyplot as plt
 
+from Py3DRF import Camera, Location
 from Py3DRF.io.nifti import NiftiVolume
-from Py3DRF.mri.browser import pick_slice_index, pick_slices
+from Py3DRF.mri.browser import pick_slice_index, pick_slices, pick_camera_angle
 
 
 def test_pick_slice_index_builds_and_returns_selection(monkeypatch):
@@ -66,3 +67,37 @@ def test_pick_slices_rejects_unknown_axis():
     volume = NiftiVolume(np.zeros((2, 2, 2)), np.eye(4))
     with pytest.raises(ValueError):
         pick_slices(volume, axes=("axial", "diagonal"))
+
+
+def test_pick_camera_angle_builds_and_returns_camera(monkeypatch):
+    monkeypatch.setattr(plt, "show", lambda *args, **kwargs: None)
+
+    camera = pick_camera_angle(Location(0, 0, 0), distance=5)
+
+    assert isinstance(camera, Camera)
+
+
+def test_pick_camera_angle_matches_focus_on_point_at_default_azimuth(monkeypatch):
+    monkeypatch.setattr(plt, "show", lambda *args, **kwargs: None)
+
+    point = Location(1, 2, 3)
+    picked = pick_camera_angle(point, elevation=0.3, distance=7, initial_degrees=45)
+
+    expected = Camera()
+    expected.focusOnPoint(point, azimuth=np.deg2rad(45), elevation=0.3, distance=7)
+
+    np.testing.assert_allclose(picked.location.to_array(), expected.location.to_array())
+    np.testing.assert_allclose(picked.rotation.to_array(), expected.rotation.to_array())
+    np.testing.assert_allclose(picked.target.to_array(), expected.target.to_array())
+
+
+def test_pick_camera_angle_non_default_initial_degrees(monkeypatch):
+    monkeypatch.setattr(plt, "show", lambda *args, **kwargs: None)
+
+    point = Location(0, 0, 0)
+    picked = pick_camera_angle(point, elevation=0.1, distance=10, initial_degrees=200)
+
+    expected = Camera()
+    expected.focusOnPoint(point, azimuth=np.deg2rad(200), elevation=0.1, distance=10)
+
+    np.testing.assert_allclose(picked.location.to_array(), expected.location.to_array())

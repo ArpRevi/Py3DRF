@@ -52,6 +52,13 @@ def _validate_axis(axis):
         raise ValueError(f"Unknown axis {axis!r}. Must be one of {list(AXIS_TO_DIM)}.")
 
 
+def _is_even_permutation(*perm):
+    """Whether `perm` (a permutation of 0..n-1) is reachable from identity order
+    by an even number of pairwise swaps -- i.e. has an even number of inversions."""
+    inversions = sum(1 for i in range(len(perm)) for j in range(i + 1, len(perm)) if perm[i] > perm[j])
+    return inversions % 2 == 0
+
+
 @dataclass(frozen=True)
 class SliceSelection:
     """
@@ -183,6 +190,18 @@ class NiftiVolume:
         idx11 = ((rg + 1) * cols + (cg + 1)).ravel()
         idx01 = (rg * cols + (cg + 1)).ravel()
         faces = np.stack([idx00, idx10, idx11, idx01], axis=1)
+
+        # The (row, col) grid's own winding only produces a face normal
+        # consistent with `normal` above (and thus with the other two slice
+        # orientations) when (free0, free1, dim) is an *even* permutation of
+        # (0, 1, 2) -- true for axial (0,1,2) and sagittal (1,2,0), but not
+        # coronal (0,2,1). Reverse the winding in the odd case so all three
+        # orientations face consistently outward (verified against a real
+        # scan: without this, the coronal slice's normal pointed exactly
+        # backward relative to the other two, leaving it unlit from the same
+        # light directions that correctly lit sagittal/axial).
+        if not _is_even_permutation(free0, free1, dim):
+            faces = faces[:, ::-1]
 
         if window is not None:
             lo, hi = window
