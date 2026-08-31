@@ -101,13 +101,25 @@ class NiftiVolume:
         alone -- no image data is touched.
 
         :param axis: "sagittal", "coronal", or "axial".
-        :param index: Voxel index along that axis.
+        :param index: Voxel index along that axis. Must be within the volume:
+            negative indices are rejected rather than wrapped, since np.take
+            would otherwise texture the plane with the far side's voxels while
+            positioning it outside the volume entirely.
         :return: SliceSelection with the plane's world-space origin (the
             transformed center of the slice) and unit normal.
+        :raises IndexError: if `index` is outside the volume along `axis`.
 
         """
         _validate_axis(axis)
         dim = AXIS_TO_DIM[axis]
+
+        index = int(index)
+        extent = self.array.shape[dim]
+        if not 0 <= index < extent:
+            raise IndexError(
+                f"Slice index {index} is out of range for the {axis!r} axis: this "
+                f"volume has {extent} slices along it (valid indices 0..{extent - 1})."
+            )
 
         voxel_center = np.array(self.array.shape, dtype=float) / 2.0
         voxel_center[dim] = index
@@ -118,7 +130,7 @@ class NiftiVolume:
         normal = self.affine[:3, :3] @ axis_direction
         normal = normal / np.linalg.norm(normal)
 
-        return SliceSelection(axis=axis, index=int(index), origin=origin, normal=normal)
+        return SliceSelection(axis=axis, index=index, origin=origin, normal=normal)
 
     def getSlice(
         self,
@@ -156,6 +168,8 @@ class NiftiVolume:
         :param percentile_clip: (low, high) percentiles of the slice's own
             intensities to clip to before normalizing, used when `window` isn't
             given. Guards against a few outlier voxels wrecking contrast.
+            Non-finite (NaN/inf) voxels are excluded from this range and render
+            at the bottom of the ramp.
         :param step: Voxel stride for the grid (1 = full resolution). Increase
             to downsample large slices for performance.
         :return: The built Mesh.
@@ -203,13 +217,27 @@ class NiftiVolume:
         if not _is_even_permutation(free0, free1, dim):
             faces = faces[:, ::-1]
 
+        # Non-finite voxels (NaN/inf) are excluded from the percentile range and
+        # then pinned to the bottom of the ramp. Feeding them through np.percentile
+        # instead -- as an earlier version did -- made both bounds NaN, which the
+        # `hi <= lo` guard below cannot catch (NaN comparisons are always False),
+        # so a single NaN voxel silently turned the whole slice's intensity
+        # attribute into NaN and handed that to the backend.
+        finite = np.isfinite(image)
+
         if window is not None:
-            lo, hi = window
+            lo, hi = float(window[0]), float(window[1])
+        elif finite.any():
+            lo, hi = np.percentile(image[finite], percentile_clip)
         else:
-            lo, hi = np.percentile(image, percentile_clip)
+            lo, hi = 0.0, 1.0
+
+        if not (np.isfinite(lo) and np.isfinite(hi)):
+            lo, hi = 0.0, 1.0
         if hi <= lo:
             hi = lo + 1.0
-        intensities = (np.clip(image, lo, hi) - lo) / (hi - lo)
+
+        intensities = (np.clip(np.where(finite, image, lo), lo, hi) - lo) / (hi - lo)
 
         mesh = Mesh(
             name or f"{selection.axis}_{selection.index}",
@@ -218,7 +246,9 @@ class NiftiVolume:
         )
         mesh.addFloatAttribute(intensities.ravel(), "intensity", domain="POINT")
         mesh.material.setFloatAttributeAsColor(
-            "intensity", colors=colors or _GRAYSCALE_RAMP, colors_positions=colors_positions
+            "intensity",
+            colors=colors if colors is not None else _GRAYSCALE_RAMP,
+            colors_positions=colors_positions,
         )
         return mesh
 

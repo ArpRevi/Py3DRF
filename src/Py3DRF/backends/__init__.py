@@ -23,6 +23,7 @@ _BACKENDS = {
     "plotly": ("Py3DRF.backends.plotly.scene", "ScenePlotly"),
     "polyscope": ("Py3DRF.backends.polyscope.scene", "ScenePolyscope"),
     "usd": ("Py3DRF.backends.usd.scene", "SceneUSD"),
+    "pyvista": ("Py3DRF.backends.pyvista.scene", "ScenePyVista"),
 }
 
 # backend name -> top-level module name that, if already imported in this

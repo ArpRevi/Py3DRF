@@ -188,11 +188,16 @@ class SceneUSD(SceneBackend):
         """
         Build (or fetch from cache) the UsdShade.Material corresponding to a Material,
         wiring up a UsdPreviewSurface shader from its constant color/roughness/emission.
-        """
-        cached = self._material_cache.get(id(material))
-        if cached is not None:
-            return cached
 
+        The cache is keyed on the Material object itself, not id(material) -- see
+        SceneBlender._buildMaterial for why an int key is unsafe. As there, the cache
+        is identity-based, so mutating a Material after its first use does not rebuild
+        the USD material.
+        """
+        # Checked before the cache lookup, not after: an attribute-driven material that
+        # was cached while it still had only constant values must still be rejected once
+        # attributes are added to it, rather than silently returning the stale entry and
+        # exporting geometry this backend cannot actually shade.
         if (
             material.color_attribute is not None
             or material.emission_color_attribute is not None
@@ -203,6 +208,10 @@ class SceneUSD(SceneBackend):
                 "emission_color_attribute / emission_strength_attribute) to a USD shading "
                 "graph yet -- only Material's constant color/roughness/emission are exported."
             )
+
+        cached = self._material_cache.get(material)
+        if cached is not None:
+            return cached
 
         material_name = Tf.MakeValidIdentifier(f"{material.name}_{len(self._material_cache)}")
         material_path = self._materials_path.AppendChild(material_name)
@@ -224,5 +233,5 @@ class SceneUSD(SceneBackend):
         shader.CreateOutput("surface", Sdf.ValueTypeNames.Token)
         usd_material.CreateSurfaceOutput().ConnectToSource(shader.ConnectableAPI(), "surface")
 
-        self._material_cache[id(material)] = usd_material
+        self._material_cache[material] = usd_material
         return usd_material

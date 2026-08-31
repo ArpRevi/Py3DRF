@@ -69,6 +69,40 @@ def test_pick_slices_rejects_unknown_axis():
         pick_slices(volume, axes=("axial", "diagonal"))
 
 
+@pytest.mark.parametrize("initial", [-1, 99])
+def test_pick_slice_index_rejects_out_of_range_initial(monkeypatch, initial):
+    # Regression: `initial` reached np.take before selectionFor ever saw it, so an
+    # out-of-range value surfaced as a raw IndexError from imshow, and a negative
+    # one silently displayed the far side of the volume while the slider -- clamped
+    # at its own minimum -- disagreed with it.
+    monkeypatch.setattr(plt, "show", lambda *args, **kwargs: None)
+    volume = NiftiVolume(np.random.rand(4, 5, 6), np.eye(4))
+
+    with pytest.raises(IndexError):
+        pick_slice_index(volume, "axial", initial=initial)
+
+
+def test_pick_slices_rejects_out_of_range_initial(monkeypatch):
+    monkeypatch.setattr(plt, "show", lambda *args, **kwargs: None)
+    volume = NiftiVolume(np.random.rand(4, 5, 6), np.eye(4))
+
+    with pytest.raises(IndexError):
+        pick_slices(volume, axes=("axial",), initial={"axial": 99})
+
+
+def test_pick_slices_keeps_repeated_axes_independent(monkeypatch):
+    # Regression: getters were keyed by axis name, so a repeated axis let the second
+    # subplot's getter overwrite the first -- returning one slider's value twice and
+    # silently discarding the other.
+    monkeypatch.setattr(plt, "show", lambda *args, **kwargs: None)
+    volume = NiftiVolume(np.random.rand(4, 5, 6), np.eye(4))
+
+    selections = pick_slices(volume, axes=("axial", "axial"), initial={"axial": 2})
+
+    assert [s.axis for s in selections] == ["axial", "axial"]
+    assert len(selections) == 2
+
+
 def test_pick_camera_angle_builds_and_returns_camera(monkeypatch):
     monkeypatch.setattr(plt, "show", lambda *args, **kwargs: None)
 

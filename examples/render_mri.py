@@ -35,7 +35,7 @@ for selection in selections:
 # shared world-space positioning (via the volume's affine) is what makes the
 # three planes visibly intersect in the render.
 
-"""
+
 scene = Scene(backend="blender", resolution=(800, 800), deafult_sun=True, transparent=False)
 
 floor = mesh.getFloor(shadow_catcher=False, size=(10000, 10000))
@@ -53,8 +53,8 @@ scene.addCamera(camera)
 
 scene.renderToFile(os.path.join(os.getcwd(), "output_mri.png"))
 print("mri blender render ok")
-"""
 
+"""
 scene = Scene(backend="plotly")
 for selection in selections:
     scene.addObject(volume.getSlice(selection))
@@ -65,7 +65,7 @@ scene.addCamera(camera)
 
 scene.renderToFile(os.path.join(os.getcwd(), "output_mri.html"))
 print("mri plotly render ok")
-
+"""
 
 """
 scene = Scene(backend="polyscope", resolution=(800, 800))

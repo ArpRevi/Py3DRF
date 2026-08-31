@@ -28,6 +28,33 @@ def _validate_axis(axis):
         raise ValueError(f"Unknown axis {axis!r}. Must be one of {list(AXIS_TO_DIM)}.")
 
 
+def _initial_index(volume, axis, initial):
+    """
+    Resolve the starting slider index for `axis`: the middle slice when `initial`
+    is None, otherwise `initial` bounds-checked against the volume.
+
+    Validating here matters because this index reaches np.take (via
+    _add_slice_subplot) before NiftiVolume.selectionFor ever sees it, so without
+    this an out-of-range value surfaces as a raw IndexError from imshow, and a
+    negative one silently displays the far side of the volume while the slider
+    -- clamped at its own minimum -- disagrees with it.
+
+    :return: A valid voxel index along `axis`.
+
+    """
+    max_index = volume.array.shape[AXIS_TO_DIM[axis]] - 1
+    if initial is None:
+        return max_index // 2
+
+    index = int(initial)
+    if not 0 <= index <= max_index:
+        raise IndexError(
+            f"initial index {index} is out of range for the {axis!r} axis: "
+            f"valid indices are 0..{max_index}."
+        )
+    return index
+
+
 def _add_slice_subplot(fig, ax, volume, axis, index, slider_rect):
     """
     Wire up one axis' imshow + Slider pair (used by both pick_slice_index and
@@ -80,9 +107,7 @@ def pick_slice_index(volume: NiftiVolume, axis, initial=None) -> SliceSelection:
 
     """
     _validate_axis(axis)
-    dim = AXIS_TO_DIM[axis]
-    max_index = volume.array.shape[dim] - 1
-    index = max_index // 2 if initial is None else int(initial)
+    index = _initial_index(volume, axis, initial)
 
     fig, ax = plt.subplots()
     plt.subplots_adjust(bottom=0.2)
@@ -120,19 +145,21 @@ def pick_slices(volume: NiftiVolume, axes=("sagittal", "coronal", "axial"), init
     fig.suptitle("close window to confirm all slices")
     plt.subplots_adjust(bottom=0.25, wspace=0.3)
 
-    getters = {}
+    # Keyed by position, not by axis name: `axes` may legitimately repeat an axis
+    # (two axial slices at different depths), and a dict keyed by name would let
+    # the second subplot's getter overwrite the first, returning one slider's
+    # value twice and silently discarding the other.
+    getters = []
     slider_width = 0.8 / n
     for i, axis in enumerate(axes):
-        dim = AXIS_TO_DIM[axis]
-        max_index = volume.array.shape[dim] - 1
-        index = max_index // 2 if axis not in initial else int(initial[axis])
+        index = _initial_index(volume, axis, initial.get(axis))
 
         slider_rect = [0.1 + i * slider_width, 0.08, slider_width - 0.05, 0.03]
-        getters[axis] = _add_slice_subplot(fig, subplot_axes[i], volume, axis, index, slider_rect)
+        getters.append(_add_slice_subplot(fig, subplot_axes[i], volume, axis, index, slider_rect))
 
     plt.show()
 
-    return [volume.selectionFor(axis, getters[axis]()) for axis in axes]
+    return [volume.selectionFor(axis, getters[i]()) for i, axis in enumerate(axes)]
 
 
 def pick_camera_angle(point: Location, elevation=np.pi / 9, distance=3, initial_degrees=45) -> Camera:
