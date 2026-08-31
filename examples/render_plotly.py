@@ -5,6 +5,7 @@ import os
 from Py3DRF import Scene, Mesh, Scale
 
 suzanne = o3d.io.read_triangle_mesh('smooth_suzanne.obj')
+
 #suzanne = o3d.io.read_triangle_mesh('s0677_vertebrae_L3.nii.g_1.stl')
 
 V = np.asarray(suzanne.vertices)

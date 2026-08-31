@@ -1,0 +1,65 @@
+name: Tests
+
+on:
+  push:
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.10", "3.12"]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+
+      - name: Install Py3DRF with test-relevant extras
+        run: pip install -e ".[test,plotly,polyscope,usd,mri]"
+
+      - name: Run tests
+        run: pytest tests/ -v
+
+  integration:
+    runs-on: ubuntu-latest
+    # Secrets aren't available to workflow runs triggered by PRs from forks
+    # (GitHub strips them for security), so skip this job entirely there
+    # rather than let it fail on a missing/unusable token.
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Checkout Py3DRF_testdata (private)
+        uses: actions/checkout@v4
+        with:
+          repository: ArpRevi/Py3DRF_testdata
+          token: ${{ secrets.TESTDATA_TOKEN }}
+          # actions/checkout refuses a `path` outside $GITHUB_WORKSPACE, so
+          # this lands as a subdirectory rather than the sibling layout used
+          # locally -- test_real_mri_data.py is pointed at it via
+          # PY3DRF_TESTDATA_DIR below instead of assuming a fixed layout.
+          path: Py3DRF_testdata
+          # The .nii/.obj files in this repo are tracked via Git LFS;
+          # without this, checkout leaves LFS pointer text files in place
+          # instead of the real binary content, and nibabel/open3d can't
+          # parse those.
+          lfs: true
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install Py3DRF with test-relevant extras
+        run: pip install -e ".[test,testdata,plotly,usd,mri]"
+
+      - name: Run real-data integration test
+        env:
+          PY3DRF_TESTDATA_DIR: ${{ github.workspace }}/Py3DRF_testdata
+        run: pytest tests/integration/ -v
