@@ -35,7 +35,6 @@ for selection in selections:
 # shared world-space positioning (via the volume's affine) is what makes the
 # three planes visibly intersect in the render.
 
-
 scene = Scene(backend="blender", resolution=(800, 800), deafult_sun=True, transparent=False)
 
 floor = mesh.getFloor(shadow_catcher=False, size=(10000, 10000))
