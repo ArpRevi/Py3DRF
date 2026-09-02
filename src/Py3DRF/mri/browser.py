@@ -16,7 +16,7 @@ dependency.
 
 import numpy as np
 import matplotlib.pyplot as plt
-from matplotlib.widgets import Slider
+from matplotlib.widgets import CheckButtons, Slider
 
 from ..core.camera import Camera
 from ..core.types import Location
@@ -55,19 +55,22 @@ def _initial_index(volume, axis, initial):
     return index
 
 
-def _add_slice_subplot(fig, ax, volume, axis, index, slider_rect):
+def _add_slice_subplot(fig, ax, volume, axis, index, slider_rect, checkbox_rect=None):
     """
     Wire up one axis' imshow + Slider pair (used by both pick_slice_index and
-    pick_slices), returning a 0-argument getter for the slider's current value.
+    pick_slices), returning zero-argument getters for the slider's current value
+    and for whether the slice is checked visible.
 
-    :param fig: Figure the slider's Axes will be added to.
+    :param fig: Figure the slider's (and checkbox's) Axes will be added to.
     :param ax: Axes the slice image is drawn into.
     :param volume: NiftiVolume being browsed.
     :param axis: "sagittal", "coronal", or "axial".
     :param index: Initial voxel index to display.
     :param slider_rect: [left, bottom, width, height] passed to fig.add_axes()
         for the slider itself, in figure-fraction coordinates.
-    :return: A zero-argument callable returning the slider's current int value.
+    :param checkbox_rect: Same, for an optional "show this slice" checkbox. When
+        omitted, no checkbox is added and visibility always reads True.
+    :return: (get_index, get_visible), both zero-argument callables.
 
     """
     dim = AXIS_TO_DIM[axis]
@@ -91,7 +94,19 @@ def _add_slice_subplot(fig, ax, volume, axis, index, slider_rect):
     # garbage-collected before the figure is closed.
     ax._slider = slider
 
-    return lambda: state["index"]
+    if checkbox_rect is None:
+        return (lambda: state["index"]), (lambda: True)
+
+    checkbox = CheckButtons(fig.add_axes(checkbox_rect), ["show"], actives=[True])
+
+    def _on_toggle(label):
+        image_artist.set_alpha(1.0 if checkbox.get_status()[0] else 0.15)
+        fig.canvas.draw_idle()
+
+    checkbox.on_clicked(_on_toggle)
+    ax._checkbox = checkbox  # kept alive for the same reason as ax._slider above
+
+    return (lambda: state["index"]), (lambda: checkbox.get_status()[0])
 
 
 def pick_slice_index(volume: NiftiVolume, axis, initial=None) -> SliceSelection:
@@ -112,7 +127,7 @@ def pick_slice_index(volume: NiftiVolume, axis, initial=None) -> SliceSelection:
     fig, ax = plt.subplots()
     plt.subplots_adjust(bottom=0.2)
     ax.set_title(f"{axis} slice -- close window to confirm")
-    get_index = _add_slice_subplot(fig, ax, volume, axis, index, [0.2, 0.05, 0.6, 0.03])
+    get_index, _ = _add_slice_subplot(fig, ax, volume, axis, index, [0.2, 0.05, 0.6, 0.03])
 
     plt.show()
 
@@ -122,16 +137,18 @@ def pick_slice_index(volume: NiftiVolume, axis, initial=None) -> SliceSelection:
 def pick_slices(volume: NiftiVolume, axes=("sagittal", "coronal", "axial"), initial=None) -> list:
     """
     Open a single window with one image + slider per axis in `axes`, side by
-    side, blocking until the window is closed -- so all of them are confirmed
-    together in one interaction instead of one pick_slice_index() call (and
-    window) per axis.
+    side, plus a "show" checkbox per axis so any of them can be dropped from the
+    result entirely -- blocking until the window is closed, so all of them are
+    confirmed together in one interaction instead of one pick_slice_index() call
+    (and window) per axis.
 
     :param volume: NiftiVolume to browse.
     :param axes: Axes to pick, in display and return order. Defaults to all
         three canonical axes.
     :param initial: Optional {axis: index} dict of initial voxel indices. Any
         axis not present defaults to the middle slice.
-    :return: List of SliceSelection, one per axis in `axes`, in the same order.
+    :return: List of SliceSelection, one per axis in `axes` left checked. An
+        axis unchecked when the window closes is omitted entirely.
 
     """
     for axis in axes:
@@ -142,8 +159,8 @@ def pick_slices(volume: NiftiVolume, axes=("sagittal", "coronal", "axial"), init
     fig, subplot_axes = plt.subplots(1, n, figsize=(4 * n, 4.5))
     if n == 1:
         subplot_axes = [subplot_axes]
-    fig.suptitle("close window to confirm all slices")
-    plt.subplots_adjust(bottom=0.25, wspace=0.3)
+    fig.suptitle("close window to confirm -- uncheck 'show' to drop a slice")
+    plt.subplots_adjust(bottom=0.3, wspace=0.3)
 
     # Keyed by position, not by axis name: `axes` may legitimately repeat an axis
     # (two axial slices at different depths), and a dict keyed by name would let
@@ -154,12 +171,20 @@ def pick_slices(volume: NiftiVolume, axes=("sagittal", "coronal", "axial"), init
     for i, axis in enumerate(axes):
         index = _initial_index(volume, axis, initial.get(axis))
 
-        slider_rect = [0.1 + i * slider_width, 0.08, slider_width - 0.05, 0.03]
-        getters.append(_add_slice_subplot(fig, subplot_axes[i], volume, axis, index, slider_rect))
+        left = 0.1 + i * slider_width
+        slider_rect = [left, 0.14, slider_width - 0.05, 0.03]
+        checkbox_rect = [left, 0.02, slider_width - 0.05, 0.09]
+        getters.append(
+            _add_slice_subplot(fig, subplot_axes[i], volume, axis, index, slider_rect, checkbox_rect)
+        )
 
     plt.show()
 
-    return [volume.selectionFor(axis, getters[i]()) for i, axis in enumerate(axes)]
+    return [
+        volume.selectionFor(axis, get_index())
+        for axis, (get_index, get_visible) in zip(axes, getters)
+        if get_visible()
+    ]
 
 
 def pick_camera_angle(point: Location, elevation=np.pi / 9, distance=3, initial_degrees=45) -> Camera:

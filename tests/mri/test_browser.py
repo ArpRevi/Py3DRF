@@ -8,6 +8,7 @@ import matplotlib.pyplot as plt
 
 from Py3DRF import Camera, Location
 from Py3DRF.io.nifti import NiftiVolume
+from Py3DRF.mri import browser
 from Py3DRF.mri.browser import pick_slice_index, pick_slices, pick_camera_angle
 
 
@@ -101,6 +102,68 @@ def test_pick_slices_keeps_repeated_axes_independent(monkeypatch):
 
     assert [s.axis for s in selections] == ["axial", "axial"]
     assert len(selections) == 2
+
+
+def test_pick_slices_checkbox_defaults_to_checked(monkeypatch):
+    monkeypatch.setattr(plt, "show", lambda *args, **kwargs: None)
+    volume = NiftiVolume(np.random.rand(6, 7, 8), np.eye(4))
+
+    _, get_visible = browser._add_slice_subplot(
+        *plt.subplots(), volume, "axial", 3, [0.2, 0.05, 0.6, 0.03], [0.2, 0.15, 0.6, 0.08]
+    )
+
+    assert get_visible() is True
+
+
+def test_pick_slice_index_has_no_checkbox_and_is_always_visible(monkeypatch):
+    # pick_slice_index doesn't pass checkbox_rect -- it always returns a single
+    # SliceSelection unconditionally, so visibility must always read True.
+    monkeypatch.setattr(plt, "show", lambda *args, **kwargs: None)
+    volume = NiftiVolume(np.random.rand(6, 7, 8), np.eye(4))
+
+    _, get_visible = browser._add_slice_subplot(*plt.subplots(), volume, "axial", 3, [0.2, 0.05, 0.6, 0.03])
+
+    assert get_visible() is True
+
+
+def test_pick_slices_unchecked_axis_is_omitted_from_the_result(monkeypatch):
+    # Simulates the user unchecking "coronal"'s checkbox before closing the window:
+    # wraps _add_slice_subplot so the coronal subplot's real checkbox is toggled off
+    # via its own public set_active() before pick_slices reads it back.
+    monkeypatch.setattr(plt, "show", lambda *args, **kwargs: None)
+
+    original = browser._add_slice_subplot
+
+    def toggle_coronal_off(fig, ax, volume, axis, index, slider_rect, checkbox_rect=None):
+        get_index, get_visible = original(fig, ax, volume, axis, index, slider_rect, checkbox_rect)
+        if axis == "coronal":
+            ax._checkbox.set_active(0)
+        return get_index, get_visible
+
+    monkeypatch.setattr(browser, "_add_slice_subplot", toggle_coronal_off)
+
+    volume = NiftiVolume(np.random.rand(6, 7, 8), np.eye(4))
+    selections = browser.pick_slices(volume, axes=("sagittal", "coronal", "axial"))
+
+    assert [s.axis for s in selections] == ["sagittal", "axial"]
+
+
+def test_pick_slices_all_unchecked_returns_empty_list(monkeypatch):
+    monkeypatch.setattr(plt, "show", lambda *args, **kwargs: None)
+
+    original = browser._add_slice_subplot
+
+    def uncheck_all(fig, ax, volume, axis, index, slider_rect, checkbox_rect=None):
+        get_index, get_visible = original(fig, ax, volume, axis, index, slider_rect, checkbox_rect)
+        ax._checkbox.set_active(0)
+        return get_index, get_visible
+
+    monkeypatch.setattr(browser, "_add_slice_subplot", uncheck_all)
+
+    volume = NiftiVolume(np.random.rand(6, 7, 8), np.eye(4))
+    selections = browser.pick_slices(volume, axes=("sagittal", "coronal", "axial"))
+
+    assert selections == []
 
 
 def test_pick_camera_angle_builds_and_returns_camera(monkeypatch):
