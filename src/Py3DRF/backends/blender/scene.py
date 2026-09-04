@@ -285,8 +285,19 @@ class SceneBlender(SceneBackend):
         """
         Build (or fetch from cache) the bpy.types.Material corresponding to a Material,
         wiring up a Principled BSDF node and any attribute-driven inputs it describes.
+
+        The cache is keyed on the Material object itself, not id(material): an int key
+        keeps nothing alive, and CPython reuses the addresses of freed objects
+        constantly, so a Material that went out of scope could hand its cache entry --
+        and its appearance -- to an unrelated Material allocated at the same address.
+        Keying on the object makes that impossible, since the dict then keeps the key
+        alive for as long as the entry exists.
+
+        Note this is deliberately identity-based: mutating a Material after the first
+        mesh using it has been added does not rebuild the bpy material, so later meshes
+        sharing it keep the appearance it had when first translated.
         """
-        cached = self._material_cache.get(id(material))
+        cached = self._material_cache.get(material)
         if cached is not None:
             return cached
 
@@ -335,7 +346,7 @@ class SceneBlender(SceneBackend):
                 nodes['principledBSDF'].inputs['Emission Strength']
             )
 
-        self._material_cache[id(material)] = bl_material
+        self._material_cache[material] = bl_material
         return bl_material
 
     def _wireAttribute(self, node_tree, nodes, links, attribute_name, colors, colors_positions, prefix, target_node, target_socket):

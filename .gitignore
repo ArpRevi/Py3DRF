@@ -4,3 +4,4 @@
 *.stl
 *.ini
 *.usda
+!pytest.ini

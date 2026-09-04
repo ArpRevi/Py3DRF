@@ -86,9 +86,8 @@ class SceneUSD(SceneBackend):
 
     def renderToFile(self, filepath):
         raise NotSupportedByBackendError(
-            "SceneUSD does not implement 'renderToFile': USD is a scene-description "
-            "format, not a renderer, so there's no rasterized image to write. Use "
-            "exportToFile to write the scene description as a .usda file instead."
+            "SceneUSD does not implement 'renderToFile' (see module docstring); "
+            "use exportToFile instead."
         )
 
     def exportToFile(self, filepath):
@@ -156,14 +155,11 @@ class SceneUSD(SceneBackend):
         """
         if mesh.point_cloud_settings is not None:
             raise NotSupportedByBackendError(
-                "SceneUSD cannot export a point cloud: Mesh.point_cloud_settings has no "
-                "mapping to a USD prim type in this backend yet. Export the plain mesh "
-                "instead, or use a backend that supports point clouds directly."
+                "SceneUSD cannot export a point cloud (see module docstring)."
             )
         if mesh.wireframe_settings is not None:
             raise NotSupportedByBackendError(
-                "SceneUSD cannot export a wireframe: Mesh.wireframe_settings has no "
-                "mapping to a USD prim type in this backend yet."
+                "SceneUSD cannot export a wireframe (see module docstring)."
             )
 
         path = self._childPath(mesh.name)
@@ -188,21 +184,29 @@ class SceneUSD(SceneBackend):
         """
         Build (or fetch from cache) the UsdShade.Material corresponding to a Material,
         wiring up a UsdPreviewSurface shader from its constant color/roughness/emission.
-        """
-        cached = self._material_cache.get(id(material))
-        if cached is not None:
-            return cached
 
+        The cache is keyed on the Material object itself, not id(material) -- see
+        SceneBlender._buildMaterial for why an int key is unsafe. As there, the cache
+        is identity-based, so mutating a Material after its first use does not rebuild
+        the USD material.
+        """
+        # Checked before the cache lookup, not after: an attribute-driven material that
+        # was cached while it still had only constant values must still be rejected once
+        # attributes are added to it, rather than silently returning the stale entry and
+        # exporting geometry this backend cannot actually shade.
         if (
             material.color_attribute is not None
             or material.emission_color_attribute is not None
             or material.emission_strength_attribute is not None
         ):
             raise NotSupportedByBackendError(
-                "SceneUSD does not map attribute-driven materials (color_attribute / "
-                "emission_color_attribute / emission_strength_attribute) to a USD shading "
-                "graph yet -- only Material's constant color/roughness/emission are exported."
+                "SceneUSD does not map attribute-driven materials to a USD shading "
+                "graph (see module docstring)."
             )
+
+        cached = self._material_cache.get(material)
+        if cached is not None:
+            return cached
 
         material_name = Tf.MakeValidIdentifier(f"{material.name}_{len(self._material_cache)}")
         material_path = self._materials_path.AppendChild(material_name)
@@ -224,5 +228,5 @@ class SceneUSD(SceneBackend):
         shader.CreateOutput("surface", Sdf.ValueTypeNames.Token)
         usd_material.CreateSurfaceOutput().ConnectToSource(shader.ConnectableAPI(), "surface")
 
-        self._material_cache[id(material)] = usd_material
+        self._material_cache[material] = usd_material
         return usd_material

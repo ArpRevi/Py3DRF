@@ -4,7 +4,7 @@ import open3d as o3d
 import numpy as np
 
 from Py3DRF import Scene
-from Py3DRF import Mesh
+from Py3DRF import Mesh, SunLight
 from Py3DRF import Location, Rotation, Scale
 
 from Py3DRF import Scene
@@ -34,7 +34,6 @@ for selection in selections:
 # Step 2: build the slice meshes and render them together -- their correct,
 # shared world-space positioning (via the volume's affine) is what makes the
 # three planes visibly intersect in the render.
-
 """
 scene = Scene(backend="blender", resolution=(800, 800), deafult_sun=True, transparent=False)
 
@@ -54,7 +53,7 @@ scene.addCamera(camera)
 scene.renderToFile(os.path.join(os.getcwd(), "output_mri.png"))
 print("mri blender render ok")
 """
-
+"""
 scene = Scene(backend="plotly")
 for selection in selections:
     scene.addObject(volume.getSlice(selection))
@@ -65,7 +64,7 @@ scene.addCamera(camera)
 
 scene.renderToFile(os.path.join(os.getcwd(), "output_mri.html"))
 print("mri plotly render ok")
-
+"""
 
 """
 scene = Scene(backend="polyscope", resolution=(800, 800))
@@ -83,3 +82,13 @@ scene.addCamera(camera)
 scene.renderToFile(os.path.join(os.getcwd(), "output_mri.png"))
 print("mri polyscope render ok")
 """
+scene = Scene(backend="pyvista", resolution=(800, 800))
+for selection in selections:
+    scene.addObject(volume.getSlice(selection))
+
+scene.addObject(mesh)
+camera = pick_camera_angle(Location(0, 0, 0), distance=500)
+scene.addCamera(camera)
+scene.addObject(SunLight(rotation=Rotation(-30 * np.pi/180, 0, -10 * np.pi/180), strength=5.0))
+scene.renderToFile(os.path.join(os.getcwd(), "output_mri.png"))
+print("mri pyvista render ok")

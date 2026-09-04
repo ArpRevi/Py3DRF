@@ -4,8 +4,8 @@ import os
 
 from Py3DRF import Scene, Mesh, Scale
 
-#suzanne = o3d.io.read_triangle_mesh('smooth_suzanne.obj')
-suzanne = o3d.io.read_triangle_mesh('s0677_vertebrae_L3.nii.g_1.stl')
+suzanne = o3d.io.read_triangle_mesh(r"..\Py3DRF_testdata\suzanne\smooth_suzanne.obj")
+
 
 V = np.asarray(suzanne.vertices)
 V = np.column_stack((V[:, 0], V[:, 2], V[:, 1]))
@@ -15,7 +15,7 @@ float_attr = V[:, 2]
 
 scene = Scene(backend="polyscope", resolution=(800, 800))
 
-mesh = Mesh("Suzanne", V, [], F, scale=Scale(0.01, 0.01, 0.01))
+mesh = Mesh("Suzanne", V, [], F, scale=Scale(0.5, 0.5, 0.5))
 mesh.addFloatAttribute(float_attr, "float_attr")
 mesh.material.setFloatAttributeAsColor("float_attr", colors=[(0, 0, 1, 1), (1, 0, 0, 1)])
 mesh.setShadeSmooth()
@@ -28,8 +28,8 @@ scene.renderToFile(os.path.join(os.getcwd(), "output_polyscope.png"))
 print("polyscope render ok")
 
 # point cloud path
-mesh2 = Mesh("SuzannePoints", V, [], F, scale=Scale(0.01, 0.01, 0.01))
-mesh2.asPointCloud(radius=0.02)
+mesh2 = Mesh("SuzannePoints", V, [], F, scale=Scale(0.5, 0.5, 0.5))
+mesh2.asPointCloud(radius=0.01)
 
 scene2 = Scene(backend="polyscope", resolution=(800, 800))
 scene2.addObject(mesh2)
@@ -42,7 +42,7 @@ print("polyscope point cloud render ok")
 # surface -- Polyscope can't hide the surface while keeping the overlay, so
 # hide_surface must stay False here (see ScenePolyscope's module docstring)
 from Py3DRF import Material
-mesh3 = Mesh("SuzanneWireframe", V, [], F, scale=Scale(0.01, 0.01, 0.01))
+mesh3 = Mesh("SuzanneWireframe", V, [], F, scale=Scale(0.5, 0.5, 0.5))
 edge_material = Material()
 edge_material.setColor((1.0, 0.05, 0.05, 1))
 mesh3.asWireframe(thickness=0.003, hide_surface=False, material=edge_material)
