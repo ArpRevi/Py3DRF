@@ -86,9 +86,8 @@ class SceneUSD(SceneBackend):
 
     def renderToFile(self, filepath):
         raise NotSupportedByBackendError(
-            "SceneUSD does not implement 'renderToFile': USD is a scene-description "
-            "format, not a renderer, so there's no rasterized image to write. Use "
-            "exportToFile to write the scene description as a .usda file instead."
+            "SceneUSD does not implement 'renderToFile' (see module docstring); "
+            "use exportToFile instead."
         )
 
     def exportToFile(self, filepath):
@@ -156,14 +155,11 @@ class SceneUSD(SceneBackend):
         """
         if mesh.point_cloud_settings is not None:
             raise NotSupportedByBackendError(
-                "SceneUSD cannot export a point cloud: Mesh.point_cloud_settings has no "
-                "mapping to a USD prim type in this backend yet. Export the plain mesh "
-                "instead, or use a backend that supports point clouds directly."
+                "SceneUSD cannot export a point cloud (see module docstring)."
             )
         if mesh.wireframe_settings is not None:
             raise NotSupportedByBackendError(
-                "SceneUSD cannot export a wireframe: Mesh.wireframe_settings has no "
-                "mapping to a USD prim type in this backend yet."
+                "SceneUSD cannot export a wireframe (see module docstring)."
             )
 
         path = self._childPath(mesh.name)
@@ -204,9 +200,8 @@ class SceneUSD(SceneBackend):
             or material.emission_strength_attribute is not None
         ):
             raise NotSupportedByBackendError(
-                "SceneUSD does not map attribute-driven materials (color_attribute / "
-                "emission_color_attribute / emission_strength_attribute) to a USD shading "
-                "graph yet -- only Material's constant color/roughness/emission are exported."
+                "SceneUSD does not map attribute-driven materials to a USD shading "
+                "graph (see module docstring)."
             )
 
         cached = self._material_cache.get(material)

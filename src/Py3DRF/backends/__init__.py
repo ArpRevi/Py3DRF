@@ -64,16 +64,11 @@ def _check_conflicts(name, allow_backend_conflict):
         return
 
     message = (
-        f"Loading the {name!r} backend imports a package known to conflict with "
-        f"{conflicting_module!r}, which this process has already imported "
-        f"(possibly via another backend). bpy and pxr each bundle their own USD "
-        f"libraries, and loading both in one process can cause crashes or subtly "
-        f"broken behavior."
+        f"Loading the {name!r} backend conflicts with {conflicting_module!r}, "
+        f"already imported in this process (see BackendConflictError/_CONFLICTS)."
     )
     if not allow_backend_conflict:
-        raise BackendConflictError(
-            message + " Pass allow_backend_conflict=True to load it anyway, at your own risk."
-        )
+        raise BackendConflictError(message)
     warnings.warn(message, BackendConflictWarning, stacklevel=3)
 
 

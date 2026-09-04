@@ -157,6 +157,33 @@ def test_wireframe_hide_surface_false_also_adds_the_surface():
     assert len(scene.plotter.actors) == 2
 
 
+def test_wireframe_with_no_edges_does_not_raise():
+    # Regression: a mesh with no faces and no explicit edges makes
+    # Mesh._edgePairs() return a (0, 2) array. tube() on a PolyData built from
+    # that has points but no line cells, and pyvista's add_mesh then raised its
+    # own "Empty meshes cannot be plotted" -- unlike Blender/Plotly, which
+    # silently render nothing for the same input. Match them instead of raising.
+    mesh = Mesh("Empty", vertices=[(0, 0, 0), (1, 0, 0)], faces=[])
+    mesh.asWireframe(thickness=0.02)
+
+    scene = ScenePyVista()
+    actor = scene.addObject(mesh)  # should not raise
+
+    assert actor is None
+    assert len(scene.plotter.actors) == 0
+
+
+def test_wireframe_with_no_edges_and_hide_surface_false_still_adds_the_surface():
+    mesh = Mesh("Empty", vertices=[(0, 0, 0), (1, 0, 0)], faces=[])
+    mesh.asWireframe(thickness=0.02, hide_surface=False)
+
+    scene = ScenePyVista()
+    actor = scene.addObject(mesh)
+
+    assert actor is None
+    assert len(scene.plotter.actors) == 1
+
+
 def test_shadow_catcher_is_approximated_as_reduced_opacity():
     mesh = Mesh("SC", **TRIANGLE)
     mesh.is_shadow_catcher = True

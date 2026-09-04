@@ -127,8 +127,7 @@ class ScenePlotly(SceneBackend):
         """
         if isinstance(object, SunLight):
             raise NotSupportedByBackendError(
-                "ScenePlotly cannot add a SunLight: Plotly has no scene-level light "
-                "object, only per-trace lighting/lightposition on Mesh3d."
+                "ScenePlotly cannot add a SunLight (see module docstring)."
             )
         if not isinstance(object, Mesh):
             raise TypeError(f"Cannot add object of type {type(object).__name__} to the scene.")
@@ -269,10 +268,8 @@ class ScenePlotly(SceneBackend):
 
         if settings.thickness_attribute is not None:
             raise NotSupportedByBackendError(
-                "ScenePlotly's wireframe rendering doesn't support per-vertex "
-                "attribute-driven thickness: a Scatter3d line trace has a single "
-                "scalar line width, not a per-vertex one. Use a constant "
-                "settings.thickness (via setWireframeThickness) instead."
+                "ScenePlotly doesn't support per-vertex wireframe thickness "
+                "(see module docstring); use a constant settings.thickness instead."
             )
 
         vertices = mesh._worldVertices()

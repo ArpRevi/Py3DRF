@@ -283,24 +283,33 @@ class ScenePyVista(SceneBackend):
 
         vertices = mesh._worldVertices()
         edges = mesh._edgePairs()
-        lines = np.hstack([[2, int(a), int(b)] for a, b in edges]) if len(edges) else None
-        line_polydata = pv.PolyData(vertices, lines=lines)
+        actor = None
 
-        if settings.thickness_attribute is not None:
-            values, _domain = mesh.float_attributes[settings.thickness_attribute]
-            line_polydata["thickness"] = np.asarray(values, dtype=float)
-            tube = line_polydata.tube(
-                radius=settings.thickness / 2, scalars="thickness", absolute=True, n_sides=settings.resolution
+        # A Mesh with no faces and no explicit edges (e.g. a point-only mesh someone
+        # called asWireframe() on) makes _edgePairs() return a (0, 2) array. tube()
+        # on a PolyData with points but no line cells returns an empty mesh, and
+        # add_mesh then raises PyVista's own "Empty meshes cannot be plotted" --
+        # confusing, and inconsistent with Blender/Plotly, which silently render
+        # nothing for the same input. Match them here instead of raising.
+        if len(edges) > 0:
+            lines = np.hstack([[2, int(a), int(b)] for a, b in edges])
+            line_polydata = pv.PolyData(vertices, lines=lines)
+
+            if settings.thickness_attribute is not None:
+                values, _domain = mesh.float_attributes[settings.thickness_attribute]
+                line_polydata["thickness"] = np.asarray(values, dtype=float)
+                tube = line_polydata.tube(
+                    radius=settings.thickness / 2, scalars="thickness", absolute=True, n_sides=settings.resolution
+                )
+            else:
+                tube = line_polydata.tube(radius=settings.thickness / 2, n_sides=settings.resolution)
+
+            actor = self.plotter.add_mesh(
+                tube,
+                color=tuple(material.color[:3]),
+                opacity=0.3 if mesh.is_shadow_catcher else 1.0,
+                show_scalar_bar=False,
             )
-        else:
-            tube = line_polydata.tube(radius=settings.thickness / 2, n_sides=settings.resolution)
-
-        actor = self.plotter.add_mesh(
-            tube,
-            color=tuple(material.color[:3]),
-            opacity=0.3 if mesh.is_shadow_catcher else 1.0,
-            show_scalar_bar=False,
-        )
 
         if not settings.hide_surface:
             surface = self._buildSurfacePolyData(mesh)
