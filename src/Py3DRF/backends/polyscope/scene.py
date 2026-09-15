@@ -121,8 +121,7 @@ class ScenePolyscope(SceneBackend):
         """
         if isinstance(object, SunLight):
             raise NotSupportedByBackendError(
-                "ScenePolyscope cannot add a SunLight: Polyscope has no scene-level "
-                "light object, only a fixed built-in shading model."
+                "ScenePolyscope cannot add a SunLight (see module docstring)."
             )
         if not isinstance(object, Mesh):
             raise TypeError(f"Cannot add object of type {type(object).__name__} to the scene.")
@@ -153,12 +152,12 @@ class ScenePolyscope(SceneBackend):
         Build a polyscope SurfaceMesh from a Mesh's world-space geometry and material.
         """
         vertices = mesh._worldVertices()
-        faces = np.asarray(mesh.faces)
+        triangles = mesh._triangles()
 
         structure = ps.register_surface_mesh(
             mesh.name,
             vertices,
-            faces,
+            triangles,
             smooth_shade=mesh.shade_smooth,
             transparency=0.3 if mesh.is_shadow_catcher else 1.0,
         )
@@ -183,31 +182,24 @@ class ScenePolyscope(SceneBackend):
 
         if settings.thickness_attribute is not None:
             raise NotSupportedByBackendError(
-                "ScenePolyscope's wireframe rendering doesn't support per-vertex "
-                "attribute-driven thickness: a surface mesh's edge_width is a "
-                "single scalar for the whole structure, not a per-vertex one. Use "
-                "a constant settings.thickness (via setWireframeThickness) instead."
+                "ScenePolyscope doesn't support per-vertex wireframe thickness "
+                "(see module docstring); use a constant settings.thickness instead."
             )
 
         if settings.hide_surface:
             raise NotSupportedByBackendError(
-                "ScenePolyscope can't hide a mesh's surface while keeping its edges "
-                "visible: edge rendering is an overlay tied to the surface mesh's "
-                "own draw call, and lowering the surface's transparency to hide it "
-                "suppresses the edge overlay too (verified empirically -- even a "
-                "transparency near 0 blanks both). Call asWireframe(hide_surface="
-                "False) to draw the wireframe as edges over the shaded surface "
-                "instead."
+                "ScenePolyscope can't hide the surface while keeping edges visible "
+                "(see module docstring); call asWireframe(hide_surface=False) instead."
             )
 
         vertices = mesh._worldVertices()
-        faces = np.asarray(mesh.faces)
+        triangles = mesh._triangles()
         material = settings.material if settings.material is not None else mesh.material
 
         structure = ps.register_surface_mesh(
             mesh.name,
             vertices,
-            faces,
+            triangles,
             smooth_shade=mesh.shade_smooth,
             transparency=0.3 if mesh.is_shadow_catcher else 1.0,
             # Real-world diameter -> Polyscope's edge_width, a genuinely screen-space

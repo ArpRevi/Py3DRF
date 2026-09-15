@@ -147,6 +147,30 @@ class Mesh:
             return np.zeros((0, 2), dtype=int)
         return np.array(sorted(pairs), dtype=int)
 
+    def _triangles(self):
+        """
+        Fan-triangulate self.faces, for backends whose native mesh primitive is
+        triangles-only (e.g. Plotly's go.Mesh3d) rather than arbitrary n-gons
+        (Blender, Polyscope and USD all take the faces as-is).
+
+        Faces may be of mixed length: an n-gon becomes n-2 triangles, all
+        sharing its first vertex. Note this assumes faces are convex and
+        planar, which is true of everything Py3DRF builds itself (quad grids
+        from NiftiVolume.getSlice, the quad from getFloor) and of typical
+        imported geometry.
+
+        :return: (T, 3) int numpy array of triangle vertex indices.
+
+        """
+        triangles = []
+        for face in self.faces:
+            for k in range(1, len(face) - 1):
+                triangles.append((int(face[0]), int(face[k]), int(face[k + 1])))
+
+        if not triangles:
+            return np.zeros((0, 3), dtype=int)
+        return np.array(triangles, dtype=int)
+
     def getMinZ(self):
         """
         Get the min Z value.
@@ -226,7 +250,7 @@ class Mesh:
         :param location: Vector of coordinates representing the new location of the object.
 
         """
-        self.location = location.to_array()
+        self.location = location
     def setRotation(self, rotation=Rotation(0, 0, 0)):
         """
         Set the rotation of the object with pivot point the origin of the local reference frame.

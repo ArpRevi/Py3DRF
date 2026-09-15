@@ -127,8 +127,7 @@ class ScenePlotly(SceneBackend):
         """
         if isinstance(object, SunLight):
             raise NotSupportedByBackendError(
-                "ScenePlotly cannot add a SunLight: Plotly has no scene-level light "
-                "object, only per-trace lighting/lightposition on Mesh3d."
+                "ScenePlotly cannot add a SunLight (see module docstring)."
             )
         if not isinstance(object, Mesh):
             raise TypeError(f"Cannot add object of type {type(object).__name__} to the scene.")
@@ -184,13 +183,20 @@ class ScenePlotly(SceneBackend):
     def _buildMesh3d(self, mesh: Mesh):
         """
         Build a go.Mesh3d trace from a Mesh's world-space geometry and material.
+
+        go.Mesh3d's i/j/k are strictly triangle indices, so faces are fan-triangulated
+        first (Mesh._triangles). Slicing the first three indices out of each face
+        instead -- as an earlier version did -- silently dropped the remaining corner
+        of every quad, losing half the surface of anything built from quads (a
+        NiftiVolume slice grid, Mesh.getFloor) in a diagonal sawtooth, and raised an
+        opaque IndexError on meshes with mixed-length faces.
         """
         vertices = mesh._worldVertices()
-        faces = np.asarray(mesh.faces)
+        triangles = mesh._triangles()
 
         trace_kwargs = dict(
             x=vertices[:, 0], y=vertices[:, 1], z=vertices[:, 2],
-            i=faces[:, 0], j=faces[:, 1], k=faces[:, 2],
+            i=triangles[:, 0], j=triangles[:, 1], k=triangles[:, 2],
             name=mesh.name,
             flatshading=not mesh.shade_smooth,
             opacity=1.0 if not mesh.is_shadow_catcher else 0.3,
@@ -262,10 +268,8 @@ class ScenePlotly(SceneBackend):
 
         if settings.thickness_attribute is not None:
             raise NotSupportedByBackendError(
-                "ScenePlotly's wireframe rendering doesn't support per-vertex "
-                "attribute-driven thickness: a Scatter3d line trace has a single "
-                "scalar line width, not a per-vertex one. Use a constant "
-                "settings.thickness (via setWireframeThickness) instead."
+                "ScenePlotly doesn't support per-vertex wireframe thickness "
+                "(see module docstring); use a constant settings.thickness instead."
             )
 
         vertices = mesh._worldVertices()

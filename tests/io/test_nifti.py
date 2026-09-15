@@ -145,6 +145,70 @@ def test_get_slice_face_winding_is_consistent_across_all_axes():
         np.testing.assert_allclose(face_normal, selection.normal, atol=1e-6, err_msg=axis)
 
 
+def test_non_finite_voxels_do_not_poison_the_whole_slice():
+    # Regression: np.percentile over a slice containing NaN returns NaN for both
+    # bounds, and the `hi <= lo` guard can't catch it (NaN comparisons are always
+    # False), so one NaN voxel turned the entire intensity attribute into NaN.
+    array = np.zeros((2, 2, 2))
+    array[:, :, 0] = [[1.0, np.nan], [3.0, 4.0]]
+    volume = NiftiVolume(array, np.eye(4))
+
+    mesh = volume.getSlice(volume.selectionFor("axial", 0))
+    intensities, _ = mesh.float_attributes["intensity"]
+
+    assert not np.any(np.isnan(intensities))
+    assert intensities.min() >= 0.0 and intensities.max() <= 1.0
+    # The non-finite voxel is pinned to the bottom of the ramp.
+    assert intensities[1] == 0.0
+
+
+def test_all_non_finite_slice_degrades_gracefully():
+    volume = NiftiVolume(np.full((2, 2, 2), np.nan), np.eye(4))
+
+    intensities, _ = volume.getSlice(volume.selectionFor("axial", 0)).float_attributes["intensity"]
+
+    assert not np.any(np.isnan(intensities))
+    np.testing.assert_allclose(intensities, 0.0)
+
+
+def test_infinite_voxels_are_excluded_from_the_window():
+    array = np.zeros((2, 2, 2))
+    array[:, :, 0] = [[1.0, np.inf], [3.0, 4.0]]
+    volume = NiftiVolume(array, np.eye(4))
+
+    intensities, _ = volume.getSlice(volume.selectionFor("axial", 0)).float_attributes["intensity"]
+
+    assert np.all(np.isfinite(intensities))
+
+
+def test_numpy_color_ramp_is_accepted():
+    # Regression: `colors or _GRAYSCALE_RAMP` raised "truth value of an array is
+    # ambiguous" for a numpy ramp -- the natural thing to pass, e.g. from a
+    # matplotlib colormap.
+    volume = NiftiVolume(np.random.rand(4, 4, 4), np.eye(4))
+    ramp = np.array([[0.0, 0.0, 0.0, 1.0], [1.0, 1.0, 1.0, 1.0]])
+
+    mesh = volume.getSlice(volume.selectionFor("axial", 1), colors=ramp)
+
+    assert mesh.material.color_attribute == "intensity"
+
+
+@pytest.mark.parametrize("index", [-1, 4, 10**6])
+def test_selection_for_rejects_out_of_range_index(index):
+    # Regression: indices were never bounds-checked. Negative ones were wrapped by
+    # np.take, so the plane was positioned outside the volume but textured with the
+    # far side's voxels -- silently wrong geometry with no error.
+    volume = NiftiVolume(np.zeros((4, 4, 4)), np.eye(4))
+    with pytest.raises(IndexError):
+        volume.selectionFor("axial", index)
+
+
+def test_selection_for_accepts_both_ends_of_the_valid_range():
+    volume = NiftiVolume(np.zeros((4, 5, 6)), np.eye(4))
+    assert volume.selectionFor("axial", 0).index == 0
+    assert volume.selectionFor("axial", 5).index == 5
+
+
 def test_load_nifti_round_trip(tmp_path):
     nib = pytest.importorskip("nibabel")
 
